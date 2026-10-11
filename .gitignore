@@ -2,3 +2,7 @@ node_modules/
 mcp/config.json
 extension/keys/
 *.log
+
+# mcp/test 只发布已登记的测试
+mcp/test/*
+!mcp/test/smoke.mjs
