@@ -1,0 +1,4 @@
+node_modules/
+mcp/config.json
+extension/keys/
+*.log

@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "BookmarkPocket",
+  "version": "0.1.0",
+  "description": "书签管理器（人机共用同一条操作管线）+ Agent 控制通道",
+  "permissions": ["bookmarks", "alarms", "storage", "favicon"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "BookmarkPocket 书签管理器" },
+  "options_page": "ui/options.html",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy95CkC4tgkCOo9eswlzbBgqrKc3MVCT6g+C2v24r70csjeHsNXLuPlTKiEGYG4/qOSQzKUBHwfzIwMqNGL6q5WuNoq9V4qfTQWg15YRWTEysrgzSXsWpO298YmG/8sekttRWZyF5cQzrlivnpxZkSwXwCxB75TCtJIcSulOthPt8ClE245/67egQAV/x6aFhhcOrjhB4oKlUzSwgFwho0KDDSK9DB6bQrdMMJvBI9BppoziGlmeXIrpZgoVD1QVuq+LBlEkOGLTB1AiOeklaNwTTujvjmq9oaCzxLWFYf2fCy7DPFnHeohYt7QL0GTOLcvUiv5o1sgtcCSogHBRRPwIDAQAB"
+}

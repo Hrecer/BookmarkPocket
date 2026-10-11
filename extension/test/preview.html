@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<title>BookmarkPocket 预览（mock 数据，非扩展页）</title>
+<link rel="stylesheet" href="../ui/manager.css">
+</head>
+<body>
+<!-- 结构与 ui/manager.html 保持同构（改动 UI 时两边同步） -->
+<div class="shell">
+  <header class="titlebar">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <span class="brandname">BookmarkPocket</span>
+    </div>
+    <nav class="nav" id="nav">
+      <span class="nav-ind"></span>
+      <button class="navitem active" data-view="browse" type="button">书签</button>
+      <button class="navitem" data-view="search" type="button">搜索</button>
+      <button class="navitem" data-view="settings" type="button">设置</button>
+    </nav>
+    <div class="titlebar-right">
+      <button id="btnTheme" class="iconbtn" type="button" title="外观：跟随系统" aria-label="外观">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 2.4a5.6 5.6 0 0 1 0 11.2z" fill="currentColor"/></svg>
+      </button>
+      <div class="bridgebox" id="bridgebox" title="桥状态">
+        <span class="dot on" id="bri"></span>
+        <span class="bridgetext" id="britext">已连接（预览）</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="pagerow navrow">
+    <div class="navbtns">
+      <button id="btnBack" class="iconbtn" type="button" title="后退" aria-label="后退">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.8 3.4 5.2 8l4.6 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button id="btnFwd" class="iconbtn" type="button" title="前进" aria-label="前进">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.2 3.4 9.8 8l-3.6 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button id="btnUp" class="iconbtn" type="button" title="上一级" aria-label="上一级">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 12.6V4.2M4.2 7.6 8 3.8l3.8 3.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div class="crumbsbar"><div class="crumbs" id="crumbs"></div></div>
+  </div>
+
+  <div class="pagerow actionrow">
+    <div class="actions">
+      <button id="btnNewFolder" class="tbtn" type="button" title="新建文件夹">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.2c0-.8.6-1.4 1.4-1.4h3l1.3 1.6h4.9c.8 0 1.4.6 1.4 1.4v6.6c0 .8-.6 1.4-1.4 1.4H3.4c-.8 0-1.4-.6-1.4-1.4z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 7.4v3.6M6.2 9.2h3.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        新建文件夹</button>
+      <button id="btnNewLink" class="tbtn" type="button" title="新建书签">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.6 9.4a3 3 0 0 0 4.2 0l2.2-2.2a3 3 0 0 0-4.2-4.2L7.6 4.2M9.4 6.6a3 3 0 0 0-4.2 0L3 8.8a3 3 0 0 0 4.2 4.2l1.2-1.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        新建书签</button>
+      <button id="btnRename" class="tbtn" type="button" title="重命名 (F2)">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 11.8.3-2.2 7-7a1.1 1.1 0 0 1 1.6 0l1.5 1.5a1.1 1.1 0 0 1 0 1.6l-7 7-2.2.3zM9.6 3.3l3.1 3.1" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        重命名</button>
+      <button id="btnDelete" class="tbtn" type="button" title="删除 (Delete)">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 4.3h10.8M6.4 2.6h3.2M4.1 4.3l.6 9a1.2 1.2 0 0 0 1.2 1.1h4.2a1.2 1.2 0 0 0 1.2-1.1l.6-9M6.6 6.9v4.7M9.4 6.9v4.7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        删除</button>
+    </div>
+    <div class="viewseg" role="group" aria-label="视图布局">
+      <span class="viewseg-ind" aria-hidden="true"></span>
+      <button id="btnViewList" class="iconbtn" type="button" title="列表视图" aria-label="列表视图">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 4.2h10.8M2.6 8h10.8M2.6 11.8h10.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <button id="btnViewGrid" class="iconbtn" type="button" title="卡片视图" aria-label="卡片视图">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.4" y="2.4" width="4.6" height="4.6" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="2.4" width="4.6" height="4.6" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2.4" y="9" width="4.6" height="4.6" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="9" width="4.6" height="4.6" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="panes" id="panes">
+    <aside class="tree-panel">
+      <div class="panel-head">导航</div>
+      <div class="tree" id="tree">
+        <div id="tspacer"></div>
+        <div id="trows"></div>
+      </div>
+    </aside>
+
+    <section class="list-card">
+      <div class="list-head" id="listhead">
+        <button class="col col-name" data-sort="title" type="button">名称<span class="sortind"></span></button>
+        <div class="col col-url">网址</div>
+        <button class="col col-date" data-sort="dateAdded" type="button">添加时间<span class="sortind"></span></button>
+      </div>
+      <div class="list" id="list">
+        <div id="spacer"></div>
+        <div id="rows"></div>
+        <div id="crows"></div>
+        <div id="empty" class="empty" hidden>
+          <div class="empty-badge">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M13 6h22v36l-11-7.4L13 42z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg>
+          </div>
+          <p class="empty-title" id="emptytitle">此文件夹为空</p>
+          <p class="empty-desc" id="emptydesc">当前文件夹中没有书签</p>
+        </div>
+        <div id="busy" class="busy" hidden><div class="spin"></div></div>
+      </div>
+    </section>
+
+    <div class="splitter" id="splitter" title="拖动调整宽度"></div>
+
+    <aside class="details" id="details"></aside>
+  </div>
+
+  <section class="searchview" id="searchview" hidden>
+    <div class="searchbar">
+      <input id="q" type="text" placeholder="全库搜索：标题 / 网址 / 文件夹 / ID…" spellcheck="false" autocomplete="off">
+      <button id="btnSearchGo" class="tbtn primary" type="button">搜索</button>
+      <button id="btnQCancel" class="tbtn" type="button" title="清空搜索并取消选中">取消</button>
+    </div>
+    <div class="searchchips">
+      <span class="chips-label">范围</span>
+      <button class="qchip on" data-scope="title" type="button">标题</button>
+      <button class="qchip on" data-scope="url" type="button">网址</button>
+      <button class="qchip on" data-scope="path" type="button">位置</button>
+      <div class="actions">
+        <button id="btnJump" class="tbtn" type="button" title="跳到所在位置（恰选 1 项）" disabled>跳转</button>
+        <button id="btnQDelete" class="tbtn danger" type="button" title="删除选中的书签（文件夹请回「浏览」页删除）">删除</button>
+      </div>
+      <div class="viewseg" role="group" aria-label="搜索结果视图布局">
+        <span class="viewseg-ind" aria-hidden="true"></span>
+        <button id="btnQViewList" class="iconbtn" type="button" title="列表视图" aria-label="列表视图">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 4.2h10.8M2.6 8h10.8M2.6 11.8h10.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <button id="btnQViewGrid" class="iconbtn" type="button" title="卡片视图" aria-label="卡片视图">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.4" y="2.4" width="4.6" height="4.6" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="2.4" width="4.6" height="4.6" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2.4" y="9" width="4.6" height="4.6" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="9" width="4.6" height="4.6" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="searchpanes">
+      <section class="list-card">
+        <div class="list-head">
+          <div class="col col-name">名称</div>
+          <div class="col col-url">网址</div>
+          <div class="col col-date">位置</div>
+        </div>
+        <div class="list" id="qlist">
+          <div id="qspacer"></div>
+          <div id="qrows"></div>
+          <div id="qcrows"></div>
+          <div id="qempty" class="empty" hidden>
+            <div class="empty-badge">
+              <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="21" cy="21" r="12" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="m30 30 8 8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
+            </div>
+            <p class="empty-title" id="qemptytitle">输入关键词后回车搜索</p>
+            <p class="empty-desc" id="qemptydesc">范围：标题 / 网址 / 所在位置</p>
+          </div>
+        </div>
+      </section>
+      <div class="splitter" id="splitter2" title="拖动调整宽度"></div>
+      <aside class="details" id="details2"></aside>
+    </div>
+  </section>
+
+  <section class="settingsview" id="settingsview" hidden>
+    <div class="card spanel">
+      <div class="dlabel">桥（连接 Agent 中枢）</div>
+      <label class="field">中枢端口<input id="cfgPort" type="number" min="1" max="65535" placeholder="19127"></label>
+      <label class="field">访问令牌（mcp/config.json 里的 token）<input id="cfgToken" type="text" placeholder="粘贴令牌" spellcheck="false"></label>
+      <div class="srow">
+        <button id="btnCfgSave" class="tbtn primary" type="button">保存并重连</button>
+        <button id="btnCfgReconnect" class="tbtn" type="button">仅重连</button>
+        <span id="cfgStatus" class="dim"></span>
+      </div>
+    </div>
+    <div class="card spanel">
+      <div class="dlabel">关于</div>
+      <div class="irow"><span class="iico"></span><span class="ilabel">扩展 ID</span><span class="ivalue mono" id="cfgExtId"></span><span></span></div>
+      <div class="irow"><span class="iico"></span><span class="ilabel">来源白名单</span><span class="ivalue mono" id="cfgOrigin"></span><span></span></div>
+      <p class="snote">把上面这行填进 mcp/config.json 的 allowedOrigins（已预置，一般无需改动）。</p>
+    </div>
+  </section>
+
+  <footer class="statusbar">
+    <span id="statusmsg">就绪</span>
+    <span id="selpill" class="selpill" hidden>已选中 0 项</span>
+    <span class="flex1"></span>
+    <span class="wm">BookmarkPocket · 预览</span>
+  </footer>
+</div>
+
+<div class="overlay" id="editorOverlay" hidden>
+  <div class="card editor">
+    <div class="overlay-head">
+      <span class="chip-icon">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.6 9.4a3 3 0 0 0 4.2 0l2.2-2.2a3 3 0 0 0-4.2-4.2L7.6 4.2M9.4 6.6a3 3 0 0 0-4.2 0L3 8.8a3 3 0 0 0 4.2 4.2l1.2-1.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </span>
+      <span class="overlay-title" id="edHeadText">新建书签</span>
+    </div>
+    <label class="field">名称<input id="edTitle" type="text" placeholder="书签名称"></label>
+    <label class="field">网址<input id="edUrl" type="text" placeholder="https://…" spellcheck="false"></label>
+    <div class="overlay-foot">
+      <button id="edCancel" class="tbtn" type="button">取消</button>
+      <button id="edSave" class="tbtn primary" type="button">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="confirmOverlay" hidden>
+  <div class="card confirm">
+    <div class="overlay-head">
+      <span class="chip-icon danger">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 4.3h10.8M6.4 2.6h3.2M4.1 4.3l.6 9a1.2 1.2 0 0 0 1.2 1.1h4.2a1.2 1.2 0 0 0 1.2-1.1l.6-9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </span>
+      <span class="overlay-title" id="cfTitle">删除</span>
+    </div>
+    <p class="confirm-msg" id="cfMsg"></p>
+    <div class="overlay-foot">
+      <button id="cfCancel" class="tbtn" type="button">取消</button>
+      <button id="cfOk" class="tbtn primary" type="button">确定</button>
+    </div>
+  </div>
+</div>
+
+<div id="ctxmenu" class="ctxmenu" hidden></div>
+
+<div id="toast" class="notice" role="status">
+  <span id="toastmsg"></span>
+  <button id="toastaction" class="tact" type="button" hidden>撤销</button>
+</div>
+
+<script>
+/* 预览沙盒：mock chrome API + 19,923 条模拟数据。
+   仅用于本地视觉/性能验证，不随扩展加载。
+   用法：?theme=dark|light  ?demo=list|details|search|root|settings  ?n=条数
+   注意：无头/日常浏览器打开本页需 --allow-file-access-from-files
+   （file:// 下 ES module 默认被 CORS 拦截：页面静态部分会渲染、JS 全不执行） */
+(function () {
+  const params = new URLSearchParams(location.search);
+  const theme = params.get("theme");
+  if (theme) document.documentElement.dataset.theme = theme;
+
+  let seq = 1;
+  const T0 = Date.now();
+  const NODES = new Map(); // id -> {id,parentId,title,url,index,dateAdded}
+
+  function add(parentId, title, url = null, index, dateAdded) {
+    const id = String(seq++);
+    const siblings = [...NODES.values()].filter((n) => n.parentId === parentId);
+    const ix = index === undefined ? siblings.length : index;
+    NODES.set(id, { id, parentId, title, url, index: ix, dateAdded: dateAdded || (T0 - seq * 3600000) });
+    return id;
+  }
+
+  const TITLE_A = ["资讯", "工具", "教程", "社区", "文档", "博客"];
+  let counter = 0;
+  function addItems(parentId, count, prefix) {
+    for (let i = 0; i < count; i++) {
+      counter++;
+      const t = TITLE_A[counter % TITLE_A.length] + " · " + prefix + " " + counter;
+      add(parentId, t, "https://site-" + counter + ".example.com/a/" + counter + "?v=1");
+    }
+  }
+
+  const barId = add("0", "收藏夹栏");
+  const otherId = add("0", "其他收藏夹");
+  add("0", "已同步");
+
+  const total = Number(params.get("n")) || 19923;
+  const otherBudget = Math.max(0, total - 10962);
+  addItems(barId, 10962, "站点");
+  const f1 = add(otherId, "新闻", null);
+  const f2 = add(otherId, "技术", null);
+  const f3 = add(otherId, "工具", null);
+  const f4 = add(otherId, "待整理", null);
+  const parts = [0.22, 0.27, 0.15, 1];
+  let acc = 0;
+  [f1, f2, f3].forEach((fid, i) => {
+    const n = Math.round(otherBudget * parts[i]);
+    acc += n;
+    addItems(fid, n, ["新闻源", "技术文", "工具站"][i]);
+  });
+  addItems(f4, Math.max(0, otherBudget - acc), "待整理");
+
+  const kids = (pid) => [...NODES.values()].filter((n) => n.parentId === pid).sort((a, b) => a.index - b.index);
+  const deep = (n) => {
+    const o = { id: n.id, title: n.title, dateAdded: n.dateAdded };
+    if (n.url !== null) o.url = n.url;
+    else o.children = kids(n.id).map(deep);
+    return o;
+  };
+
+  function snapshot(ids) {
+    const out = [];
+    function walk(id) {
+      const n = NODES.get(id);
+      if (!n) return;
+      out.push({ id: n.id, parentId: n.parentId, index: n.index, title: n.title, url: n.url, dateAdded: n.dateAdded });
+      if (n.url === null) for (const k of kids(id)) walk(k.id);
+    }
+    for (const id of ids) walk(id);
+    return out;
+  }
+  function removeTree(id) {
+    const n = NODES.get(id);
+    if (!n) return;
+    if (n.url === null) for (const k of kids(id)) removeTree(k.id);
+    NODES.delete(id);
+  }
+  const undoStack = [];
+
+  const favCache = new Map();
+  function favFor(url) {
+    const m = /site-(\d+)/.exec(url || "");
+    if (!m) return "";
+    const n = Number(m[1]);
+    if (favCache.has(n)) return favCache.get(n);
+    const c = document.createElement("canvas");
+    c.width = c.height = 32;
+    const g = c.getContext("2d");
+    g.fillStyle = "hsl(" + ((n * 47) % 360) + " 62% 52%)";
+    g.beginPath();
+    if (g.roundRect) g.roundRect(0, 0, 32, 32, 8); else g.rect(0, 0, 32, 32);
+    g.fill();
+    g.fillStyle = "rgba(255,255,255,.94)";
+    g.font = "bold 17px Segoe UI, sans-serif";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(String.fromCharCode(65 + (n % 26)), 16, 17);
+    const d = c.toDataURL("image/png");
+    favCache.set(n, d);
+    return d;
+  }
+
+  globalThis.chrome = {
+    runtime: {
+      id: "preview",
+      getURL(p) {
+        try {
+          if (String(p).startsWith("/_favicon")) {
+            const u = new URLSearchParams(String(p).split("?")[1]).get("pageUrl");
+            return favFor(u);
+          }
+          return "";
+        } catch (e) { return ""; }
+      },
+      getManifest: () => ({ version: "0.1.0-preview" }),
+      openOptionsPage() {},
+      async sendMessage(msg) {
+        const op = msg && msg.op;
+        const args = (msg && msg.args) || {};
+        try {
+          if (op === "bookmark.tree") {
+            return { ok: true, data: { tree: [{ id: "0", title: "", children: kids("0").map(deep) }], cached: false } };
+          }
+          if (op === "bookmark.create") {
+            const id = add(args.parentId, args.title || "", args.url || null);
+            const n = NODES.get(id);
+            return { ok: true, data: { created: { id: n.id, parentId: n.parentId, title: n.title, url: n.url || undefined, dateAdded: n.dateAdded } } };
+          }
+          if (op === "bookmark.update") {
+            const n = NODES.get(args.id);
+            if (!n) return { ok: false, error: "节点不存在: " + args.id };
+            if (args.title !== undefined) n.title = args.title;
+            if (args.url !== undefined) n.url = args.url;
+            return { ok: true, data: { updated: { id: n.id, title: n.title, url: n.url || undefined } } };
+          }
+          if (op === "bookmark.moveMany") {
+            const before = [];
+            let moved = 0;
+            const failed = [];
+            for (const id of args.ids || []) {
+              const n = NODES.get(id);
+              if (!n) { failed.push({ id, error: "不存在" }); continue; }
+              before.push({ id: n.id, parentId: n.parentId, index: n.index, title: n.title, url: n.url, dateAdded: n.dateAdded });
+              n.parentId = args.parentId;
+              n.index = kids(args.parentId).filter((x) => x.id !== id).length;
+              moved++;
+            }
+            undoStack.push(before);
+            return { ok: true, data: { moved, failed, summary: "批量移动 " + moved + " 项" } };
+          }
+          if (op === "bookmark.copy") {
+            const created = [];
+            let copied = 0;
+            const copyInto = (node, targetParent) => {
+              const nid = add(targetParent, node.title, node.url, undefined, node.dateAdded);
+              copied++;
+              if (node.url === null) for (const k of kids(node.id)) copyInto(k, nid);
+              return nid;
+            };
+            for (const id of args.ids || []) {
+              const n = NODES.get(id);
+              if (n) created.push(copyInto(n, args.parentId));
+            }
+            undoStack.push({ __delete: created });
+            return { ok: true, data: { copied, failed: [], created, summary: "复制 " + copied + " 项" } };
+          }
+          if (op === "bookmark.remove") {
+            const ids = args.ids || [];
+            const nodes = snapshot(ids);
+            let removed = 0;
+            for (const id of ids) if (NODES.has(id)) { removed++; removeTree(id); }
+            undoStack.push(nodes);
+            return { ok: true, data: { removed, summary: "删除 " + removed + " 项" } };
+          }
+          if (op === "bookmark.undoLast") {
+            const rec = undoStack.pop();
+            if (!rec) return { ok: false, error: "没有可撤销的操作" };
+            if (rec && rec.__delete) {
+              for (const id of rec.__delete) removeTree(id);
+              return { ok: true, data: { undone: "bookmark.copy", summary: "删除复制品" } };
+            }
+            const remap = new Map();
+            for (const n of rec) {
+              const parentId = remap.get(n.parentId) || n.parentId;
+              const cur = NODES.get(n.id);
+              if (cur) { cur.parentId = parentId; remap.set(n.id, n.id); }
+              else { const nid = add(parentId, n.title, n.url, undefined, n.dateAdded); remap.set(n.id, nid); }
+            }
+            return { ok: true, data: { undone: "bookmark.remove", summary: "删除 " + rec.length + " 项" } };
+          }
+          if (op === "sys.bridge.status" || op === "sys.bridge.reconnect") {
+            return { ok: true, data: { connected: true, url: "ws://127.0.0.1:19127/", lastError: null } };
+          }
+          if (op === "log.tail") return { ok: true, data: { total: 0, entries: [] } };
+          return { ok: false, error: "预览未实现的操作: " + op };
+        } catch (e) {
+          return { ok: false, error: String((e && e.message) || e) };
+        }
+      },
+    },
+    storage: { local: { async get() { return {}; }, async set() {} } },
+    tabs: { create(o) { globalThis.__lastOpened = o && o.url; return { id: 1 }; } },
+  };
+
+  /* ---------- 演示驱动（截图用） ---------- */
+  window.addEventListener("load", () => {
+    const demo = params.get("demo");
+    if (!demo) return;
+    let tries = 0;
+    const timer = setInterval(() => {
+      if (!window.__bpStats) { if (++tries > 80) clearInterval(timer); return; }
+      clearInterval(timer);
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      (async () => {
+        if (demo === "list" || demo === "details" || demo === "search" || demo === "card" || demo === "cardsearch") {
+          const tn = [...document.querySelectorAll(".tnode")].find((x) => x.textContent.includes("收藏夹栏"));
+          if (tn) tn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          await sleep(500);
+        }
+        if (demo === "details" || demo === "search") {
+          const row = [...document.querySelectorAll("#rows .row")].find((r) => r.style.display !== "none" && r.dataset.idx === "2");
+          if (row) row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          await sleep(300);
+        }
+        if (demo === "settings") {
+          const nav = document.querySelector('.navitem[data-view="settings"]');
+          if (nav) nav.click();
+          await sleep(300);
+        }
+        if (demo === "search") {
+          const nav = document.querySelector('.navitem[data-view="search"]');
+          if (nav) nav.click();
+          await sleep(200);
+          const q = document.querySelector("#q");
+          q.value = "站点 16";
+          document.querySelector("#btnSearchGo").click();
+          await sleep(300);
+          const row = document.querySelector("#qrows .row");
+          if (row) row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        }
+        if (demo === "root") {
+          const crumb = [...document.querySelectorAll(".crumb")].find((c) => c.textContent.includes("全部书签"));
+          if (crumb) crumb.click();
+        }
+        if (demo === "card") {
+          const g = document.querySelector("#btnViewGrid");
+          if (g) g.click();
+          await sleep(500);
+        }
+        if (demo === "cardsearch") {
+          const nav = document.querySelector('.navitem[data-view="search"]');
+          if (nav) nav.click();
+          await sleep(250);
+          const q = document.querySelector("#q");
+          q.value = "站点 16";
+          document.querySelector("#btnSearchGo").click();
+          await sleep(300);
+          const g = document.querySelector("#btnQViewGrid");   // 搜索页自己那组按钮
+          if (g) g.click();
+          await sleep(400);
+        }
+      })();
+    }, 100);
+  });
+})();
+</script>
+<script type="module" src="../ui/manager.js"></script>
+</body>
+</html>

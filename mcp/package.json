@@ -1,0 +1,18 @@
+{
+  "name": "bookmarkpocket-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BookmarkPocket AI 接入：MCP stdio 服务 + 本地 WS 中枢（连接浏览器扩展的同一操作管线）",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node test/smoke.mjs"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
+  }
+}
