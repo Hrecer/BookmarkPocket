@@ -15,6 +15,9 @@
 .srow { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
 .srow .tbtn { border-radius: 16px; }
 .srow .dim { font-size: 12px; }
+/* 中枢面板里的「关闭中枢」是危险操作，单独上 danger 色（srow 默认没有这层） */
+.spanel .tbtn.danger { color: var(--danger); }
+.spanel .tbtn.danger:hover:not(:disabled) { background: var(--danger-container); box-shadow: none; }
 /* 分段选择（外观）：选中的那枚用强调底，和顶栏导航胶囊同一套语言 */
 .segs { gap: 6px; flex-wrap: wrap; }
 .segs .tbtn.on { background: var(--accent-container); font-weight: 600; box-shadow: none; }

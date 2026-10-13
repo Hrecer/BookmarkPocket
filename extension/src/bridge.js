@@ -6,8 +6,9 @@ import { K } from "./keys.js";
 
 let ws = null;
 let retryDelay = 1000;
-let state = { connected: false, url: null, since: null, lastError: null };
+let state = { connected: false, url: null, since: null, lastError: null, hub: null };
 let waiters = [];
+let shutdownReply = null;   // 等待「关闭中枢」确认的回调（一次一个）
 
 export function getState() { return { ...state }; }
 
@@ -65,9 +66,30 @@ export async function connect() {
     let m;
     try { m = JSON.parse(ev.data); } catch (e) { return; }
     if (m.type === "welcome") {
-      state = { connected: true, url, since: Date.now(), lastError: null };
+      // welcome 里带中枢自身信息（进程号/内存/启动时间）：管理页据此显示「后台 Node 进程」
+      state = {
+        connected: true, url, since: Date.now(), lastError: null,
+        hub: {
+          version: m.version || null,
+          port: m.port || null,
+          startedAt: m.startedAt || null,
+          pid: m.pid || null,
+          rssMb: m.rssMb ?? null,
+          cpuPct: m.cpuPct ?? null,
+          at: Date.now(),
+        },
+      };
       retryDelay = 1000;
       flushWaiters(true);
+      return;
+    }
+    if (m.type === "hubStatus") {
+      // 中枢每 5 秒推一次自己的占用情况
+      if (state.hub) state.hub = { ...state.hub, pid: m.pid, rssMb: m.rssMb, cpuPct: m.cpuPct, at: Date.now() };
+      return;
+    }
+    if (m.type === "shutdown") {
+      if (shutdownReply) shutdownReply({ ok: !!m.ok, error: m.error });
       return;
     }
     if (m.type === "ping") {
@@ -87,6 +109,7 @@ export async function connect() {
   sock.onclose = (e) => {
     if (ws !== sock) return;   // 旧连接的关闭事件不得污染新连接状态
     state.connected = false;
+    state.hub = null;
     const why = e && e.code ? "（code " + e.code + (e.reason ? "：" + e.reason : "") + "）" : "";
     if (!state.lastError) state.lastError = "连接已断开" + why;
     flushWaiters(false);
@@ -119,7 +142,7 @@ export async function reconnect() {
   try { ws && ws.close(); } catch (e) { /* ignore */ }
   ws = null;
   retryDelay = 1000;
-  state = { connected: false, url: state.url, since: null, lastError: null };
+  state = { connected: false, url: state.url, since: null, lastError: null, hub: null };
   flushWaiters(false);
   await ensure();
   const ok = await waitConnected(2500);
@@ -136,4 +159,21 @@ function scheduleRetry() {
 export function sendEvent(event, args) {
   if (!ws || ws.readyState !== WebSocket.OPEN || !state.connected) return;
   try { ws.send(JSON.stringify({ type: "event", event, args })); } catch (e) { /* ignore */ }
+}
+
+// 请中枢自我关闭。只有「独立中枢」（用户自己启动的那个）会真的关；
+// 内嵌在宿主里的那份会回绝 —— 关掉它会连带宿主的 MCP 一起没。
+export function shutdownHub(ms = 2500) {
+  return new Promise((resolve) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN || !state.connected) {
+      resolve({ ok: false, error: "未连接中枢" });
+      return;
+    }
+    let done = false;
+    const finish = (r) => { if (done) return; done = true; shutdownReply = null; resolve(r); };
+    shutdownReply = finish;
+    try { ws.send(JSON.stringify({ type: "shutdown" })); }
+    catch (e) { finish({ ok: false, error: String((e && e.message) || e) }); return; }
+    setTimeout(() => finish({ ok: true, note: "已发出关闭请求（未等到确认）" }), ms);
+  });
 }

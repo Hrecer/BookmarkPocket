@@ -71,7 +71,51 @@ export async function refreshCfgStatus() {
   try {
     const s = await op("sys.bridge.status");
     el.textContent = s.connected ? "当前：已连接 " + s.url : "当前：未连接（" + (s.lastError || "等待中枢") + "）";
+    renderHubPanel(s);
   } catch (e) { el.textContent = "当前：无法读取桥状态"; }
+}
+
+function fmtDuration(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return s + " 秒";
+  const m = Math.floor(s / 60), h = Math.floor(m / 60);
+  if (!h) return m + " 分 " + (s % 60) + " 秒";
+  return h + " 时 " + (m % 60) + " 分";
+}
+
+// 「中枢」面板：那个后台 Node 进程（宿主拉起的 MCP 服务，兼任浏览器↔AI 的中转）
+// 跑没跑、进程号、内存/CPU 占用、运行多久；随时可以一键把它关掉。
+export function renderHubPanel(s) {
+  const mode = $("#hubMode"), info = $("#hubAddr"), up = $("#hubUptime"), btn = $("#btnHubStop"), note = $("#hubNote");
+  if (!mode) return;
+  if (!s || !s.connected) {
+    mode.textContent = "未运行";
+    info.textContent = "—";
+    up.textContent = "—";
+    btn.disabled = true;
+    note.textContent = "后台 Node 进程当前没在跑，AI 工具也不可用。要用就在宿主命令框敲 /mcp reload。";
+    return;
+  }
+  const h = s.hub || {};
+  mode.textContent = "运行中";
+  info.textContent = "PID " + (h.pid ?? "—") +
+    "　内存 " + (h.rssMb != null ? h.rssMb + " MB" : "—") +
+    "　CPU " + (h.cpuPct != null ? h.cpuPct + "%" : "—");
+  up.textContent = (h.startedAt ? fmtDuration(Date.now() - h.startedAt) : "—") + (h.port ? "（端口 " + h.port + "）" : "");
+  btn.disabled = false;
+  note.textContent = "关掉它 = 结束这个后台 Node 进程；AI 工具随即断开，直到你在宿主里敲 /mcp reload。";
+}
+
+export async function stopHub() {
+  const btn = $("#btnHubStop"), note = $("#hubNote");
+  if (btn) btn.disabled = true;
+  if (note) note.textContent = "正在关闭中枢…";
+  let r = null;
+  try { r = await op("sys.hub.shutdown"); }
+  catch (e) { r = { ok: false, error: String((e && e.message) || e) }; }
+  if (r && r.ok) toast("中枢已关闭；AI 工具已断开，要用请在宿主敲 /mcp reload", { ms: 3200 });
+  else toast("关闭失败：" + ((r && r.error) || "未知原因"), { error: true });
+  pollBridge();
 }
 
 export async function pollBridge() {

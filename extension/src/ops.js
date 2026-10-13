@@ -25,7 +25,7 @@ export function isInternalWrite() { return internal > 0; }
 // 认领口径是父目录，不能只按 id 一刀切：那样会把浏览器随后对同一条书签的挪动也当成自己的而漏掉。
 const selfWrites = new Map();
 
-function markSelf(ids, parentId) {
+export function markSelf(ids, parentId) {
   const ts = Date.now();
   for (const id of [].concat(ids)) selfWrites.set(String(id), { parentId: String(parentId), ts });
 }
@@ -90,7 +90,7 @@ function addPaths(tree) {
   return tree;
 }
 
-async function ensureTree(fresh) {
+export async function ensureTree(fresh) {
   if (!fresh && treeCache) return treeCache;
   treeCache = addPaths(await bm().getTree());
   return treeCache;
@@ -402,6 +402,13 @@ const OPS = {
         for (const m of u.moves) {
           try { await bm().move(m.id, { parentId: m.parentId, index: m.index }); } catch (e) { /* 尽力 */ }
           markSelf(m.id, m.parentId);
+        }
+        // 批量归位顺带新建的目标文件夹：搬回去后若已空，一并回收（不留空壳）
+        for (const id of u.createdFolders || []) {
+          try {
+            const kids = await bm().getChildren(id);
+            if (!kids.length) await bm().removeTree(id);
+          } catch (e) { /* 尽力 */ }
         }
       } else if (u.kind === "update") {
         const dir = { title: u.before.title };

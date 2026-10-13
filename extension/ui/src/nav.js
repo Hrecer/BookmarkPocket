@@ -13,28 +13,68 @@ export async function goTo(id, opts = {}) {
   await navigate(id, opts);
 }
 
+// 从 descendantId 往上找，返回「它落在 ancestorId 名下时」那一层的直接子节点 id。
+// 用于「从子文件夹回到祖先目录」时把刚出来的那个子文件夹选中（像资源管理器）。
+// 不是祖先关系（平级跳转）则返回 null。
+function childOnPath(ancestorId, descendantId) {
+  let cur = descendantId;
+  while (cur && cur !== ancestorId) {
+    const p = parentOf.get(cur);
+    if (!p) return null;
+    if (p === ancestorId) return cur;
+    cur = p;
+  }
+  return null;
+}
+
+function expandTo(id) {
+  let cur = id;
+  while (parentOf.has(cur) && parentOf.get(cur) !== "0") { expanded.add(cur); cur = parentOf.get(cur); }
+}
+
 export async function navigate(id, { push = true } = {}) {
   if (id !== S.currentFolderId) {
-    if (push) { S.backStack.push(S.currentFolderId); S.fwdStack.length = 0; }
+    const prev = S.currentFolderId;
+    if (push) { S.backStack.push(prev); S.fwdStack.length = 0; }
     S.currentFolderId = id;
     // 换了文件夹就不保留选中：否则「刚进入的那个文件夹」会一直挂在选中集里，
     // 之后按 Delete 或点详情栏的删除按钮，删掉的就是整个文件夹（连同里面的书签）。
     S.sel.clear(); S.anchor = null;
+    // 但「从子目录回到祖先目录」要例外交待：把刚出来的那个子文件夹选中，跟资源管理器一致。
+    const cameFrom = prev ? childOnPath(id, prev) : null;
+    if (cameFrom) S.sel = new Set([cameFrom]);
+    // 滚动位置也按目录归零：否则在子文件夹里滚到底，回到父文件夹还停在底部。
+    listEl.scrollTop = 0;
+    listEl._mark = 0;   // 同步滚动标记，免得被判成「用户超大幅滚动」而短暂停掉图标
+    expandTo(id);
+    await refresh({ busy: false, entering: true, counts: true });
+    if (cameFrom) {
+      scrollIdIntoView(cameFrom);
+      const idx = S.viewRows.findIndex((v) => v.node.id === cameFrom);
+      if (idx >= 0) S.anchor = idx;
+    }
+    return;
   }
-  // 展开到该目录所在链，便于树可见
-  let cur = id;
-  while (parentOf.has(cur) && parentOf.get(cur) !== "0") { expanded.add(cur); cur = parentOf.get(cur); }
+  expandTo(id);
   await refresh({ busy: false, entering: true, counts: true });
 }
 
-export function back() { if (!S.backStack.length) return; S.fwdStack.push(S.currentFolderId); S.currentFolderId = S.backStack.pop(); refresh({ entering: true, counts: true }); }
+// 前进/后退同样走 navigate，好让「滚动归零 + 选中来源子文件夹」这套只写一处。
+export async function back() {
+  if (!S.backStack.length) return;
+  S.fwdStack.push(S.currentFolderId);
+  await navigate(S.backStack.pop(), { push: false });
+}
 
-export function forward() { if (!S.fwdStack.length) return; S.backStack.push(S.currentFolderId); S.currentFolderId = S.fwdStack.pop(); refresh({ entering: true, counts: true }); }
+export async function forward() {
+  if (!S.fwdStack.length) return;
+  S.backStack.push(S.currentFolderId);
+  await navigate(S.fwdStack.pop(), { push: false });
+}
 
 export function up() {
   if (S.currentFolderId === "0") return;
-  const p = parentOf.get(S.currentFolderId) || "0";
-  goTo(p);
+  goTo(parentOf.get(S.currentFolderId) || "0");
 }
 
 export function renderCrumbs() {

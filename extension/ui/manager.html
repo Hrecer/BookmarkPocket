@@ -224,6 +224,17 @@
       </div>
     </div>
     <div class="card spanel">
+      <div class="dlabel">中枢（后台 Node 进程）</div>
+      <div class="irow"><span class="iico"></span><span class="ilabel">状态</span><span class="ivalue" id="hubMode">—</span><span></span></div>
+      <div class="irow"><span class="iico"></span><span class="ilabel">进程 / 占用</span><span class="ivalue mono" id="hubAddr">—</span><span></span></div>
+      <div class="irow"><span class="iico"></span><span class="ilabel">已运行</span><span class="ivalue" id="hubUptime">—</span><span></span></div>
+      <div class="srow">
+        <button id="btnHubStop" class="tbtn danger" type="button" disabled>关闭中枢</button>
+        <span id="hubNote" class="dim"></span>
+      </div>
+      <p class="snote">中枢是浏览器扩展 ↔ AI 之间的本机中转，由宿主的 MCP 服务进程兼任 —— 它就是任务管理器里那一个 node 进程。这里能看到它的进程号、内存与 CPU 占用，也能随时把它关掉；宿主退出时它也会自己退出，不会留在后台。</p>
+    </div>
+    <div class="card spanel">
       <div class="dlabel">关于</div>
       <div class="irow"><span class="iico"></span><span class="ilabel">扩展 ID</span><span class="ivalue mono" id="cfgExtId"></span><span></span></div>
       <div class="irow"><span class="iico"></span><span class="ilabel">来源白名单</span><span class="ivalue mono" id="cfgOrigin"></span><span></span></div>

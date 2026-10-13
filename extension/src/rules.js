@@ -6,7 +6,9 @@
 // 匹配是纯函数，存储读写也在这一层；不碰 DOM，写操作一律走 ops（可撤销、有日志）。
 
 import { K } from "./keys.js";
-import { execute, isSelfWrite, note } from "./ops.js";
+import { execute, isSelfWrite, note, ensureTree, markSelf, invalidateTree } from "./ops.js";
+
+const bm = () => globalThis.chrome.bookmarks;
 
 const DEFAULT_PATH = "收藏夹栏";
 
@@ -66,25 +68,37 @@ export function matches(rule, url) {
 }
 
 // 自上而下先命中先用；都没命中才走兜底。返回目标路径，null 表示不动。
-export function pickTarget(cfg, url) {
+// useFallback=false 时只认显式规则、忽略兜底（事后整理默认如此，免得把无关书签吸进兜底目录）。
+export function pickTarget(cfg, url, useFallback = true) {
   if (!cfg || cfg.enabled === false) return null;
   for (const r of cfg.list) if (matches(r, url)) return r.target;
-  return cfg.fallback.enabled ? cfg.fallback.path : null;
+  return useFallback && cfg.fallback.enabled ? cfg.fallback.path : null;
 }
 
 // 把 "收藏夹栏 > 示例分类 > 子目录" 解析成文件夹 id；缺哪一层就建哪一层。
-async function folderIdByPath(path) {
+// tree 是当前树快照；cache 记住本次操作里「父目录+标题 → id」的解析结果，
+// 这样同一批里新建的分支能被后续路径复用。createFolder 决定「怎么建」（走 execute 记账，或直连 bm）。
+async function resolvePathId(tree, path, cache, createFolder) {
   const parts = String(path || "").split(">").map((s) => s.trim()).filter(Boolean);
   if (!parts.length) return null;
+  const root = tree[0];
   let parentId = "0";
   for (const title of parts) {
-    const root = (await execute("bookmark.tree", {})).tree[0];
-    const here = parentId === "0" ? { children: root.children } : findById(root, parentId);
+    const key = parentId + "\u0000" + title;
+    if (cache.has(key)) { parentId = cache.get(key); continue; }
+    const here = parentId === "0" ? root : findById(root, parentId);
     const hit = ((here && here.children) || []).find((n) => !n.url && n.title === title);
-    if (hit) { parentId = hit.id; continue; }
-    parentId = (await execute("bookmark.create", { parentId, title })).created.id;
+    if (hit) { parentId = hit.id; cache.set(key, hit.id); continue; }
+    const made = await createFolder(parentId, title);
+    cache.set(key, made.id);
+    parentId = made.id;
   }
   return parentId;
+}
+
+async function folderIdByPath(path) {
+  const tree = await ensureTree(false);
+  return resolvePathId(tree, path, new Map(), async (parentId, title) => (await execute("bookmark.create", { parentId, title })).created);
 }
 
 function findById(node, id) {
@@ -126,4 +140,90 @@ export async function settleMove(id, parentId) {
   if (!cur || !cur.url) return null;
   await note("rules.settle", `外部移动：${cur.title || cur.id} → ${cur.path || parentId}`);
   return autoRoute(id, cur);
+}
+
+/* ---------- 事后整理：把规则套用到已有书签 ---------- */
+
+// 按当前规则把「已经躺在库里」的书签搬正（新收藏有 autoRoute，这一支补的是存量）。
+// 本函数跑在 execute 的串行队列里，内部只直连 chrome.bookmarks——再调 execute 会自锁。
+// 一笔操作日志 + 一键撤销：撤销会把书签搬回原位，并回收本次新建的空文件夹。
+export async function applyRules({ path: scope, dryRun = false, includeFallback = false, config } = {}) {
+  const cfg = config ? normalize(config) : await read();
+  if (!cfg.enabled) throw new Error("「收藏归位」总开关是关的：规则不会生效，请先开启（rules_set 里设 enabled:true）");
+
+  const tree = await ensureTree(true);
+  const scopeLc = scope ? String(scope).trim().toLowerCase() : "";
+  const all = [];
+  (function walk(nodes) { for (const n of nodes || []) { all.push(n); if (n.children) walk(n.children); } })(tree);
+  const cands = all.filter((n) => n.url && (!scopeLc || String(n.path || "").toLowerCase().includes(scopeLc)));
+
+  const cache = new Map();        // 路径解析缓存（含本次新建的分支）
+  const createdFolders = [];      // 本次新建的文件夹 id
+  let willCreate = 0;             // 预演时统计「将会新建」的文件夹数
+  const createFolder = async (parentId, title) => {
+    if (dryRun) { willCreate++; return { id: "\u0000dry:" + parentId + "/" + title }; }   // 预演不落刀
+    const made = await bm().create({ parentId, title });
+    markSelf(made.id, parentId);
+    createdFolders.push(made.id);
+    return made;
+  };
+
+  const items = [];               // 待搬条目
+  let already = 0, noRule = 0;
+  for (const n of cands) {
+    const target = pickTarget(cfg, n.url, includeFallback);
+    if (!target) { noRule++; continue; }
+    let targetId;
+    try { targetId = await resolvePathId(tree, target, cache, createFolder); }
+    catch (e) { noRule++; continue; }
+    if (!targetId) { noRule++; continue; }
+    if (String(n.parentId) === String(targetId)) { already++; continue; }
+    items.push({ id: n.id, title: n.title || "", from: n.path || "", to: target, targetId, parentId: n.parentId, index: n.index });
+  }
+
+  const byTarget = new Map();
+  for (const it of items) byTarget.set(it.to, (byTarget.get(it.to) || 0) + 1);
+  const report = {
+    scope: scope || "(整棵树)",
+    considered: cands.length,
+    matched: items.length,
+    alreadyInPlace: already,
+    noRule,
+    byTarget: [...byTarget.entries()].map(([target, count]) => ({ target, count })).sort((a, b) => b.count - a.count),
+    samples: items.slice(0, 20).map(({ title, from, to }) => ({ title, from, to })),
+    createdFolders: createdFolders.map(String),
+    willCreateFolders: willCreate,
+  };
+
+  if (dryRun) return { ...report, dryRun: true, moved: 0, failed: [] };
+  if (!items.length) return { ...report, dryRun: false, moved: 0, failed: [] };   // 无命中：不落刀、不记日志
+
+  const groups = new Map();
+  for (const it of items) {
+    if (!groups.has(it.targetId)) groups.set(it.targetId, []);
+    groups.get(it.targetId).push(it.id);
+  }
+  const moves = items.map((it) => ({ id: it.id, parentId: it.parentId, index: it.index }));
+
+  let moved = 0;
+  const failed = [];
+  for (const [parentId, ids] of groups) {
+    markSelf(ids, parentId);   // 先记账再搬：事件异步派发，晚记会把我们自己的移动当外部移动
+    for (let i = 0; i < ids.length; i += 128) {
+      await Promise.all(ids.slice(i, i + 128).map(async (id) => {
+        try { await bm().move(id, { parentId }); moved++; }
+        catch (e) { failed.push({ id, error: String((e && e.message) || e) }); }
+      }));
+    }
+  }
+  invalidateTree();
+
+  return {
+    ...report,
+    dryRun: false,
+    moved,
+    failed,
+    summary: `一键归位：搬迁 ${moved} 项 → ${groups.size} 个目标文件夹`,
+    undo: { kind: "moveMany", moves, createdFolders: createdFolders.map(String) },
+  };
 }

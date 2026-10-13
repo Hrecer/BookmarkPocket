@@ -9,8 +9,10 @@ defineOps({
   "sys.bridge.status": { fn: async () => bridge.getState() },
   "sys.bridge.reconnect": { fn: async () => { await bridge.reconnect(); return bridge.getState(); } },
   "sys.bridge.pair": { fn: async () => bridge.pair() },
+  "sys.hub.shutdown": { fn: async () => bridge.shutdownHub() },
   "rules.get": { fn: async () => rules.read() },
   "rules.set": { fn: async ({ config } = {}) => rules.write(config) },
+  "rules.apply": { mutating: true, fn: async (args) => rules.applyRules(args) },
 });
 
 function boot() {

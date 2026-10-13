@@ -3,6 +3,23 @@
 
 import { z } from "zod";
 
+// 「收藏归位」规则配置：rules_set（写入设置）与 rules_apply（临时用一套整理）共用。
+const rulesConfig = z
+  .object({
+    enabled: z.boolean().optional(),
+    fallback: z.object({ enabled: z.boolean().optional(), path: z.string().optional() }).optional(),
+    list: z
+      .array(
+        z.object({
+          enabled: z.boolean().optional(),
+          match: z.object({ type: z.enum(["host", "url"]), value: z.string() }),
+          target: z.string(),
+        })
+      )
+      .optional(),
+  })
+  .describe("整份规则配置");
+
 export const TOOLS = [
   {
     name: "bridge_status",
@@ -109,22 +126,20 @@ export const TOOLS = [
       "整份写入「收藏归位」规则。开启后，新收藏的书签（Ctrl+D / 点星星 / 拖拽）按规则自动归位；" +
       "list 自上而下先命中先用，target 写文件夹路径（如 \"收藏夹栏 > 示例分类 > 子目录\"，不存在会自动建）",
     op: "rules.set",
+    shape: { config: rulesConfig },
+  },
+  {
+    name: "rules_apply",
+    description:
+      "把「收藏归位」规则套用到已有书签（事后整理/一键归位）：可用 path 限定只整理某个文件夹下的书签；" +
+      "默认只按显式规则搬、忽略兜底（避免把无关书签吸进兜底目录），includeFallback:true 才启用兜底；" +
+      "dryRun:true 只预演清单不落刀；整批只记一笔撤销",
+    op: "rules.apply",
     shape: {
-      config: z
-        .object({
-          enabled: z.boolean().optional(),
-          fallback: z.object({ enabled: z.boolean().optional(), path: z.string().optional() }).optional(),
-          list: z
-            .array(
-              z.object({
-                enabled: z.boolean().optional(),
-                match: z.object({ type: z.enum(["host", "url"]), value: z.string() }),
-                target: z.string(),
-              })
-            )
-            .optional(),
-        })
-        .describe("整份规则配置"),
+      path: z.string().optional().describe("只整理所在文件夹路径包含该片段的书签（如 \"某分类\"）；省略=整棵树"),
+      dryRun: z.boolean().optional().describe("true 时只返回将搬迁的清单，不落刀"),
+      includeFallback: z.boolean().optional().describe("true 时未命中显式规则的书签也按兜底归位（默认 false）"),
+      config: rulesConfig.optional().describe("临时用这套规则整理（不写入设置）；省略则用已保存的规则"),
     },
   },
 ];
