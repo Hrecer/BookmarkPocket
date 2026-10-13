@@ -1,0 +1,287 @@
+/* 三栏：树、列表、详情，以及滚动条 —— 由 manager.css 按段拆出，引入顺序见 manager.html。 */
+
+/* ---------- 三栏 ---------- */
+.panes {
+  flex: 1; min-height: 0;
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr) 10px var(--details-w);
+  padding: 0 12px;
+}
+.tree-panel { display: flex; flex-direction: column; min-height: 0; padding-right: 6px; }
+.panel-head {
+  height: 32px; display: flex; align-items: center;
+  padding: 0 10px; font-size: 12px; font-weight: 600;
+  color: var(--fg-dim); letter-spacing: .02em; flex: none;
+}
+.tree {
+  position: relative; flex: 1; min-height: 0; overflow: auto; padding-bottom: 8px;
+  /* 虚拟滚动自己定位行元素，浏览器的「滚动锚定」在这里只有坏处：
+     内容一变它就会悄悄改写 scrollTop，拖动滑块时表现为滑块跳、不跟手，所以关掉。
+     scrollbar-gutter: stable 让纵向滚动条的位置常驻 —— 滚动条出现/消失不再改变
+     可视宽度，也就不会连带改变滑块的长度和它相对鼠标的位置。 */
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+}
+
+/* ---------- 滚动条（照 MD3 Expressive：透明轨道 + 圆角胶囊滑块，加粗好抓） ----------
+   16px 是可抓范围，4px 透明边框把它收成 8px 的可见胶囊；hover 收到 10px、按住拖到 12px，
+   所以「看着不臃肿、但很好抓」。
+   这里不能再用标准属性 scrollbar-color / scrollbar-width —— Chrome 一旦认了它们，
+   下面整组 ::-webkit-scrollbar 就会失效，hover 变宽也就没了。 */
+.tree::-webkit-scrollbar,
+.list::-webkit-scrollbar,
+.details::-webkit-scrollbar,
+.settingsview::-webkit-scrollbar,
+.rulesview::-webkit-scrollbar { width: 16px; height: 16px; }
+.tree::-webkit-scrollbar-track,
+.list::-webkit-scrollbar-track,
+.details::-webkit-scrollbar-track,
+.settingsview::-webkit-scrollbar-track,
+.rulesview::-webkit-scrollbar-track { background: transparent; }
+.tree::-webkit-scrollbar-corner,
+.list::-webkit-scrollbar-corner,
+.details::-webkit-scrollbar-corner,
+.settingsview::-webkit-scrollbar-corner,
+.rulesview::-webkit-scrollbar-corner { background: transparent; }
+.tree::-webkit-scrollbar-thumb,
+.list::-webkit-scrollbar-thumb,
+.details::-webkit-scrollbar-thumb,
+.settingsview::-webkit-scrollbar-thumb,
+.rulesview::-webkit-scrollbar-thumb {
+  background: var(--sb); border: 4px solid transparent; background-clip: padding-box; border-radius: 999px;
+}
+.tree::-webkit-scrollbar-thumb:hover,
+.list::-webkit-scrollbar-thumb:hover,
+.details::-webkit-scrollbar-thumb:hover,
+.settingsview::-webkit-scrollbar-thumb:hover,
+.rulesview::-webkit-scrollbar-thumb:hover {
+  background-color: var(--sb-strong); border-width: 3px; background-clip: padding-box;
+}
+.tree::-webkit-scrollbar-thumb:active,
+.list::-webkit-scrollbar-thumb:active,
+.details::-webkit-scrollbar-thumb:active,
+.settingsview::-webkit-scrollbar-thumb:active,
+.rulesview::-webkit-scrollbar-thumb:active {
+  background-color: var(--sb-strong); border-width: 2px; background-clip: padding-box;
+}
+#tspacer { width: 1px; }
+/* 行容器只作为「第 0 行」的定位原点：每行自己按行号 translateY，
+   滚动时留在窗口里的行完全不动，不用整体平移再重填。 */
+#trows { position: absolute; top: 0; left: 0; right: 0; }
+
+.tnode {
+  /* right: auto + width: max-content：行宽跟着内容走，长文件夹名 / 深层缩进会把整行撑宽，
+     撑出 .tree 的横向溢出 → 底部自动出现横向滚动条，滚过去就能看全名字。
+     min-width: 100% 保证短名字的行依然占满面板（hover / 选中的底色不会只有一小截）。 */
+  position: absolute; top: 0; left: 0; right: auto;
+  width: max-content; min-width: 100%;
+  display: flex; align-items: center; gap: 6px;
+  height: 28px; margin: 1px 0; padding-right: 8px; border-radius: 12px;
+  cursor: default; white-space: nowrap;
+  transition: background-color .1s;
+}
+.tnode:hover { background: var(--tint); }
+.tnode.current { background: var(--accent-container); }
+.tnode.sel { background: var(--accent-container-strong); }
+.tnode.enter { animation: rowIn .16s ease both; }
+@keyframes rowIn { from { opacity: 0; } to { opacity: 1; } }
+
+.tchev {
+  width: 20px; height: 20px; flex: none; border: 0; border-radius: 10px;
+  display: grid; place-items: center; padding: 0;
+  background: transparent; color: var(--fg-faint); cursor: pointer;
+  transition: background-color .12s, transform .15s;
+}
+.tchev svg { width: 13px; height: 13px; }
+.tchev:hover { background: var(--tint-strong); color: var(--fg); }
+.tchev.empty { visibility: hidden; }
+.tnode.expanded .tchev { transform: rotate(90deg); }
+
+.tico { width: 16px; height: 16px; flex: none; display: grid; place-items: center; color: var(--fg-dim); }
+.tico svg { width: 15px; height: 15px; }
+.tico img { width: 15px; height: 15px; border-radius: 4px; }
+/* 不再省略号截断：名字有多长就多长，超出的部分靠底部横向滚动条去看 */
+.tname { font-size: 13px; flex: none; }
+.tnode.folder .tname { font-weight: 500; }
+.tchip {
+  margin-left: 4px; padding: 0 7px; min-height: 16px; line-height: 16px;
+  border-radius: 9px; background: var(--chip-bg); color: var(--fg-dim);
+  font-size: 10.5px; font-weight: 500; flex: none;
+}
+
+/* 中列表卡 */
+.list-card {
+  display: flex; flex-direction: column; min-height: 0; min-width: 0;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 20px; margin-bottom: 10px; overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.list-head {
+  display: grid; grid-template-columns: minmax(0, 1fr) 300px 140px;
+  align-items: center; height: 32px; flex: none;
+  padding: 0 16px; border-bottom: 1px solid var(--line);
+  font-size: 12px; color: var(--fg-dim);
+}
+.col { text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.col {
+  border: 0; background: transparent; color: inherit; font: inherit;
+  cursor: pointer; height: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  transition: color .12s;
+}
+button.col:hover { color: var(--fg); }
+.sortind { font-size: 10px; }
+.list {
+  position: relative; flex: 1; min-height: 0; overscroll-behavior: contain;
+  /* 行是 3 列定宽网格，永远不需要横向滚动：直接关掉横向。这样横向滚动条不会
+     出现/消失，可视高度恒定 —— 否则它一冒出来就把可视高度吃掉 16px，
+     纵向滑块的长度随之变化，鼠标就与滑块脱节了。 */
+  overflow-y: auto; overflow-x: hidden;
+  overflow-anchor: none;      /* 同理：虚拟滚动不需要浏览器帮忙锚定 */
+  scrollbar-gutter: stable;
+}
+#spacer { width: 1px; }
+#rows { position: absolute; top: 0; left: 6px; right: 6px; }
+
+.row {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: grid; grid-template-columns: minmax(0, 1fr) 300px 140px;
+  align-items: center; height: 36px; padding: 0 10px; border-radius: 12px;
+  white-space: nowrap; cursor: default; user-select: none;
+  transition: background-color .1s;
+}
+.row:hover { background: var(--tint); }
+.row.sel { background: var(--accent-container); }
+.row.enter { animation: rowIn .16s ease both; }
+.row.droptarget { background: var(--accent-container-strong); }
+
+.cell-name { display: flex; align-items: center; gap: 0; min-width: 0; }
+.cell-name .ico { width: 20px; height: 20px; flex: none; display: grid; place-items: center; color: var(--fg-dim); }
+.cell-name .ico svg { width: 17px; height: 17px; }
+.cell-name .ico img { width: 16px; height: 16px; border-radius: 4px; }
+.cell-name .nm { font-size: 14px; margin-left: 10px; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.row.folder .cell-name .nm { font-weight: 500; }
+.cell-name .chip {
+  margin-left: 8px; padding: 0 7px; min-height: 16px; line-height: 16px;
+  border-radius: 9px; background: var(--chip-bg); color: var(--fg-dim);
+  font-size: 10.5px; font-weight: 500; flex: none;
+}
+.cell-url { color: var(--fg-faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; padding: 0 12px 0 0; }
+.cell-date { color: var(--fg-dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+mark { background: var(--accent-container-strong); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+/* 行内改名 */
+.inline-edit {
+  font: 13.5px var(--font); height: 24px; padding: 0 7px;
+  border: 2px solid var(--accent); border-radius: 6px;
+  background: var(--surface); color: var(--fg); outline: none;
+  min-width: 120px; max-width: 100%;
+  line-height: 18px;   /* 内容盒只有 20px（24 减掉上下 2px 边框），行盒压到 18px 才有余量 */
+}
+
+/* 空态 / 遮罩 */
+.empty {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 0 24px; pointer-events: none;
+}
+.empty[hidden] { display: none; }
+.empty-badge {
+  width: 96px; height: 96px; border-radius: 32px; display: grid; place-items: center;
+  background: var(--tint); color: var(--fg-faint);
+}
+.empty-badge svg { width: 40px; height: 40px; }
+.empty-title { font-size: 17px; font-weight: 600; margin-top: 18px; }
+.empty-desc { font-size: 12px; color: var(--fg-faint); margin-top: 6px; max-width: 360px; }
+.busy {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  background: var(--busy-bg); backdrop-filter: blur(1px);
+}
+.busy[hidden] { display: none; }
+.spin {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 3px solid var(--tint-strong); border-top-color: var(--accent);
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 分隔条 + 详情栏 */
+.splitter { cursor: col-resize; position: relative; }
+.splitter::after {
+  content: ""; position: absolute; top: 8px; bottom: 18px; left: 4.5px; width: 1px;
+  background: var(--line); border-radius: 2px;
+  transition: background-color .12s, width .12s, left .12s;
+}
+.splitter:hover::after, .splitter.dragging::after { background: var(--accent); width: 3px; left: 3.5px; }
+
+.details {
+  min-height: 0; overflow: auto;
+  overflow-anchor: none;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 20px; margin-bottom: 10px;
+  box-shadow: var(--shadow);
+}
+.details-inner { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.dcard {
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 20px; padding: 12px;
+}
+.dlabel { font-size: 11px; color: var(--fg-faint); margin-bottom: 8px; }
+
+.dhead { display: flex; align-items: flex-start; gap: 12px; background: transparent; border: 0; padding: 4px 2px; }
+.dhead-ico {
+  width: 44px; height: 44px; flex: none; border-radius: 12px;
+  display: grid; place-items: center; background: var(--tint); color: var(--fg-dim);
+  overflow: hidden;
+}
+.dhead-ico img { width: 30px; height: 30px; border-radius: 8px; }
+.dhead-ico svg { width: 24px; height: 24px; }
+.dhead-name { font-size: 15px; font-weight: 600; line-height: 1.4; word-break: break-all; padding-top: 2px; }
+
+.durl { display: flex; align-items: flex-start; gap: 8px; }
+.durl-text {
+  flex: 1; min-width: 0; font: 12px var(--mono); color: var(--fg-dim);
+  word-break: break-all; user-select: text; line-height: 1.6;
+}
+.copybtn {
+  width: 26px; height: 24px; flex: none; border: 0; border-radius: 8px;
+  display: grid; place-items: center; background: transparent; color: var(--fg-faint); cursor: pointer;
+  transition: background-color .12s, color .12s;
+}
+.copybtn svg { width: 13px; height: 13px; }
+.copybtn:hover { background: var(--tint); color: var(--fg); }
+
+.irow { display: grid; grid-template-columns: 16px 62px minmax(0, 1fr) auto; gap: 0; margin: 0 0 8px; align-items: start; }
+.irow:last-child { margin-bottom: 0; }
+.irow .iico { color: var(--fg-faint); padding-top: 1px; }
+.irow .iico svg { width: 13px; height: 13px; }
+.irow .ilabel { font-size: 12px; color: var(--fg-faint); }
+.irow .ivalue { font-size: 12px; color: var(--fg-dim); user-select: text; word-break: break-all; }
+.irow .ivalue.accent { color: var(--accent-deep); font-weight: 600; }
+.irow .ivalue.mono { font: 11px var(--mono); word-break: break-all; }
+.irow .icopy { width: 24px; height: 22px; }
+
+.dpills { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.dpills .tbtn { justify-content: center; background: var(--tint); }
+.dpills .tbtn:hover { background: var(--tint-strong); box-shadow: none; }
+.dpills .span2 { grid-column: span 2; }
+.dicons { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
+.dicons .tbtn { padding: 0; width: 32px; height: 32px; justify-content: center; background: transparent; }
+.dicons .tbtn:hover { background: var(--tint); box-shadow: none; }
+.dicons .tbtn.danger { color: var(--danger); }
+
+.dstats { text-align: center; padding: 6px 4px; }
+.dstats-icon { width: 52px; height: 52px; margin: 2px auto 10px; border-radius: 16px; display: grid; place-items: center; background: var(--accent-container); color: var(--accent-deep); }
+.dstats-icon svg { width: 26px; height: 26px; }
+.dstats-title { font-size: 18px; font-weight: 600; }
+.dstats-chips { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+.dchip { padding: 0 10px; min-height: 20px; line-height: 20px; border-radius: 10px; background: var(--chip-bg); color: var(--fg-dim); font-size: 11px; }
+.dstats-hint { font-size: 11px; color: var(--fg-faint); margin-top: 10px; }
+.dstats-del { margin-top: 12px; display: flex; justify-content: center; }
+.dstats-del .tbtn { background: var(--danger-container); color: var(--danger); font-weight: 600; }
+
+.dempty { margin-top: 110px; text-align: center; color: var(--fg-faint); }
+.dempty-badge { width: 72px; height: 72px; margin: 0 auto 14px; border-radius: 24px; display: grid; place-items: center; background: var(--tint); }
+.dempty-badge svg { width: 30px; height: 30px; }
+.dempty p:first-of-type { font-size: 13px; color: var(--fg-dim); }
+.dempty p + p { font-size: 11px; margin-top: 4px; }
+

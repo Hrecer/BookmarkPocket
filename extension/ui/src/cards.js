@@ -5,7 +5,7 @@
 //     applyWindow，只是行高换成「卡片高 + 间距」，逻辑行数 = 向上取整(项数 / 列数)。
 //   · 交互层（单击打开 / 就地编辑 / 两击删除 / 框选 / 视图切换）在 card-ops.js。
 //
-// 卡片样式全部用本项目设计变量，见 manager.css 的「卡片模式」一节。
+// 卡片样式全部用本项目设计变量，见 ui/css/cards.css。
 
 import { S, cPool, qcPool, nodeById, parentOf, recLinks } from "./state.js";
 import { fmtDate } from "./data.js";

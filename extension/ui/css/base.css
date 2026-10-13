@@ -1,0 +1,121 @@
+/* 设计变量 / reset / 骨架 —— 由 manager.css 按段拆出，引入顺序见 manager.html。 */
+
+/* BookmarkPocket 管理器 UI
+   面板结构与操作逻辑对齐 LinkPocket（左树 210 / 中列表 / 右详情 286 可拖；导航行、动作行、状态栏）
+   视觉为自有方案：纯中性灰底（R=G=B，不带色偏）+ 雾霾紫强调 · 入场动画只用透明度 */
+
+:root {
+  color-scheme: light dark;
+  --font: system-ui, "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  --mono: "Cascadia Mono", Consolas, monospace;
+
+  --app-bg: #efefef;
+  --surface: #ffffff;
+  --surface-2: #f7f7f7;
+  --fg: #262626;
+  --fg-dim: #5f5f5f;
+  --fg-faint: #8c8c8c;
+  --line: #e6e6e6;
+  --tint: rgba(0, 0, 0, .05);
+  --tint-strong: rgba(0, 0, 0, .09);
+  --accent: #7d72a8;
+  --accent-deep: #655b8f;
+  --accent-container: #ece9f5;
+  --accent-container-strong: #ddd8ef;
+  --danger: #b3656b;
+  --danger-container: #f6e8e9;
+  --chip-bg: #f0f0f0;
+  --on-primary: #ffffff;
+  --primary-fill: #655b8f;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .06);
+  --shadow-float: 0 8px 26px -10px rgba(0, 0, 0, .26);
+  --busy-bg: rgba(255, 255, 255, .6);
+  --sb: rgba(0, 0, 0, .22);
+  --sb-strong: rgba(0, 0, 0, .4);
+  --tonal: #ffffff;
+  --tonal-strong: #efefef;
+  --details-w: 286px;
+}
+/* 外观三态：
+   ① 未写 data-theme（默认 / 「跟随系统」）→ 由下面的媒体查询决定；
+   ② html[data-theme="light"|"dark"] → 固定成某一种。
+   这两个属性选择器的特异性高于媒体查询里的 :root，所以能压过系统设置；
+   color-scheme 同步写死，让原生滚动条 / 输入光标 / 焦点环也一致。 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --app-bg: #181818;
+    --surface: #2a2a2a;
+    --surface-2: #333333;
+    --fg: #e4e4e4;
+    --fg-dim: #a0a0a0;
+    --fg-faint: #757575;
+    --line: rgba(255, 255, 255, .09);
+    --tint: rgba(255, 255, 255, .06);
+    --tint-strong: rgba(255, 255, 255, .11);
+    --accent: #a99dd0;
+    --accent-deep: #c2b8e0;
+    --accent-container: rgba(169, 157, 208, .18);
+    --accent-container-strong: rgba(169, 157, 208, .28);
+    --danger: #e59aa0;
+    --danger-container: rgba(229, 154, 160, .16);
+    --chip-bg: rgba(255, 255, 255, .07);
+    --on-primary: #241f33;
+    --primary-fill: #a99dd0;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .45);
+    --shadow-float: 0 8px 28px -10px rgba(0, 0, 0, .75);
+    --busy-bg: rgba(24, 24, 24, .55);
+    --sb: rgba(255, 255, 255, .22);
+    --sb-strong: rgba(255, 255, 255, .4);
+    --tonal: rgba(255, 255, 255, .1);
+    --tonal-strong: rgba(255, 255, 255, .16);
+  }
+}
+html[data-theme="light"] {
+  color-scheme: light;
+  --app-bg: #efefef; --surface: #ffffff; --surface-2: #f7f7f7;
+  --fg: #262626; --fg-dim: #5f5f5f; --fg-faint: #8c8c8c; --line: #e6e6e6;
+  --tint: rgba(0,0,0,.05); --tint-strong: rgba(0,0,0,.09);
+  --accent: #7d72a8; --accent-deep: #655b8f;
+  --accent-container: #ece9f5; --accent-container-strong: #ddd8ef;
+  --danger: #b3656b; --danger-container: #f6e8e9; --chip-bg: #f0f0f0;
+  --on-primary: #ffffff; --primary-fill: #655b8f;
+  --shadow: 0 1px 2px rgba(0,0,0,.06); --shadow-float: 0 8px 26px -10px rgba(0,0,0,.26);
+  --busy-bg: rgba(255,255,255,.6);
+  --sb: rgba(0,0,0,.22); --sb-strong: rgba(0,0,0,.4);
+  --tonal: #ffffff; --tonal-strong: #efefef;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg: #181818; --surface: #2a2a2a; --surface-2: #333333;
+  --fg: #e4e4e4; --fg-dim: #a0a0a0; --fg-faint: #757575; --line: rgba(255,255,255,.09);
+  --tint: rgba(255,255,255,.06); --tint-strong: rgba(255,255,255,.11);
+  --accent: #a99dd0; --accent-deep: #c2b8e0;
+  --accent-container: rgba(169,157,208,.18); --accent-container-strong: rgba(169,157,208,.28);
+  --danger: #e59aa0; --danger-container: rgba(229,154,160,.16); --chip-bg: rgba(255,255,255,.07);
+  --on-primary: #241f33; --primary-fill: #a99dd0;
+  --shadow: 0 1px 2px rgba(0,0,0,.45); --shadow-float: 0 8px 28px -10px rgba(0,0,0,.75);
+  --busy-bg: rgba(24,24,24,.55);
+  --sb: rgba(255,255,255,.22); --sb-strong: rgba(255,255,255,.4);
+  --tonal: rgba(255,255,255,.1); --tonal-strong: rgba(255,255,255,.16);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  font: 13px/1.45 var(--font);
+  background: var(--app-bg);
+  color: var(--fg);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--accent-container-strong); }
+/* 焦点环只画环，不改元素形状 —— 这里原本还有一条 border-radius: 8px，
+   会被灌到任何获得焦点的元素上。输入框一个都跑不掉（<input> 只要聚焦就匹配
+   :focus-visible），而输入框的文字与插入符是按自身圆角裁剪的：插入符又恰好贴在
+   x=0，于是被左侧圆弧啃掉上下两端，变成一条弧形线。圆角由各元素自己声明，
+   焦点环会自动跟着它的形状走。 */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.shell { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+

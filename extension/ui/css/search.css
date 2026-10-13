@@ -1,0 +1,74 @@
+/* 搜索页，以及拖拽 / 剪切 / 右键菜单 —— 由 manager.css 按段拆出，引入顺序见 manager.html。 */
+
+/* ---------- 搜索页 ---------- */
+.searchview { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 12px 10px; }
+.searchview[hidden] { display: none; }
+.searchbar {
+  display: flex; align-items: center; gap: 8px; flex: none;
+  height: 44px; margin: 4px 0 8px; padding: 0 8px 0 16px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 22px;
+  box-shadow: var(--shadow);
+}
+.searchbar:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-container); }
+.searchbar input {
+  flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: inherit;
+  font: 13px var(--font);
+  /* 高度和行高都要写死，不能让它自己算：
+     font: 13px 会把 line-height 重置成 normal；而不写 height 的输入框，高度是按
+     「主字体」（Segoe UI Variable）的行高算出来的。占位符里的中文会回退到微软雅黑，
+     它的 ascent/descent 更高 —— 闪烁的插入符是按实际使用的字体的行盒绘制的，
+     于是高出内容盒，上下各被切掉一截。这里把行盒压到 18px、内容盒放大到 24px，
+     上下各留 3px 余量，插入符再也不可能被截断。 */
+  height: 24px;
+  line-height: 18px;
+  padding: 0;
+  /* 显式写 0：插入符贴在 x=0，只要这里有一丝圆角，它就会被圆弧切出弧度。
+     圆角是外层 .searchbar 的事（22px 胶囊），输入框自己必须方方正正。 */
+  border-radius: 0;
+}
+.searchbar input::placeholder { color: var(--fg-faint); }
+.actions .tbtn.danger { color: var(--danger); }
+.actions .tbtn.danger:hover:not(:disabled) { background: var(--danger-container); box-shadow: none; }
+.searchchips { display: flex; align-items: center; gap: 6px; flex: none; margin: 0 2px 8px; }
+.chips-label { font-size: 11.5px; color: var(--fg-faint); margin-right: 2px; }
+.qchip {
+  height: 26px; padding: 0 12px; border: 0; border-radius: 13px;
+  background: var(--tint); color: var(--fg-dim); font: 12px var(--font); cursor: pointer;
+  transition: background-color .12s, color .12s;
+}
+.qchip:hover { background: var(--tint-strong); color: var(--fg); }
+.qchip.on { background: var(--accent-container); color: var(--fg); font-weight: 600; }
+.searchpanes { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 10px var(--details-w); }
+.searchview .list-head { grid-template-columns: minmax(0, 1fr) 340px 220px; }
+#qspacer { width: 1px; }
+#qrows { position: absolute; top: 0; left: 6px; right: 6px; }
+#qrows .row { grid-template-columns: minmax(0, 1fr) 340px 220px; }
+.cell-loc { color: var(--fg-faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- 拖拽 / 剪切 / 右键菜单 ---------- */
+body.dragging { cursor: grabbing; user-select: none; }
+body.dragging * { cursor: grabbing !important; }
+.dragghost {
+  position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none;
+  padding: 5px 12px; border-radius: 12px; max-width: 320px;
+  background: var(--surface); border: 1px solid var(--line);
+  box-shadow: var(--shadow-float); font-size: 12px; color: var(--fg);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.row.dropok, .tnode.dropok, .crumb.dropok { background: var(--accent-container-strong) !important; }
+/* 拖到列表空白处（=落到当前文件夹）不再画整块高亮边缘，太扎眼 */
+.row.cut, .tnode.cut { opacity: .45; }
+.ctxmenu {
+  position: fixed; z-index: 70; min-width: 172px; padding: 5px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 13px;
+  box-shadow: var(--shadow-float);
+}
+.ctxitem {
+  display: block; width: 100%; text-align: left;
+  padding: 7px 12px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--fg); font: 12.5px var(--font); cursor: pointer; white-space: nowrap;
+}
+.ctxitem:hover:not(:disabled) { background: var(--tint); }
+.ctxitem:disabled { color: var(--fg-faint); cursor: default; }
+.ctxsep { height: 1px; margin: 5px 8px; background: var(--line); }
+

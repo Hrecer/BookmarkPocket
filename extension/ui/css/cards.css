@@ -1,0 +1,114 @@
+/* 卡片本体、文件夹卡片、就地编辑、视图切换、框选 —— 由 manager.css 按段拆出，引入顺序见 manager.html。 */
+
+/* ---------- 卡片本体 ---------- */
+.bcard {
+  position: relative;
+  height: 100%; min-width: 0; padding: 18px;
+  display: flex; flex-direction: column;
+  /* 卡面用纯 --surface（浅色下就是白）：参考项目里卡片永远比画布「亮一档」，
+     这样卡片才浮得起来、里面的深色文字才清楚。画布那档暗色由下面 card-browse/card-search 给。 */
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: var(--shadow);
+  cursor: pointer; user-select: none; overflow: hidden;
+  contain: layout paint style;
+  transition: border-color .13s, box-shadow .13s, background-color .13s;
+}
+.bcard:hover { border-color: var(--accent); box-shadow: var(--shadow-float); }
+/* 选中态画在卡片内侧：外侧投影会被滚动容器裁掉，导致上/下边缘缺一条、看着不齐 */
+.bcard.sel { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.bcard.sel:hover { box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-float); }
+.bcard.cut { opacity: .45; }
+.bcard.enter { animation: rowIn .16s ease both; }
+
+.bcard-hd { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.bcard-ico { width: 22px; height: 22px; flex: none; display: grid; place-items: center; color: var(--fg-dim); }
+.bcard-ico svg { width: 19px; height: 19px; }
+.bcard-ico img { width: 18px; height: 18px; border-radius: 5px; }
+.bcard-name {
+  min-width: 0; flex: 1; font-size: 13.5px; font-weight: 600; color: var(--fg);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bcard-sub {
+  margin-top: 7px; font-size: 12px; color: var(--fg-dim); line-height: 1.4;
+  /* 网址最多两行，超出省略：卡片高度固定，虚拟滚动才能精确按行高定位 */
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  word-break: break-all;
+}
+.bcard-foot { margin-top: auto; display: flex; align-items: center; gap: 8px; min-height: 26px; }
+.bcard-meta { font-size: 11px; color: var(--fg-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bcard-acts { margin-left: auto; display: flex; align-items: center; gap: 2px; flex: none; }
+
+.bcard-btn {
+  width: 26px; height: 26px; border: 0; border-radius: 9px;
+  display: grid; place-items: center; padding: 0;
+  background: transparent; color: var(--fg-faint); cursor: pointer;
+  transition: background-color .12s, color .12s, transform .12s;
+}
+.bcard-btn svg { width: 15px; height: 15px; }
+.bcard-btn:hover { background: var(--tint-strong); color: var(--fg); }
+/* 「选中」键：单击打开的卡片视图里，选中就靠它 */
+.bcard-btn.pick.on { color: var(--accent-deep); }
+.bcard-btn.pick.on:hover { background: var(--accent-container); }
+.bcard-btn.edit.save { color: var(--accent-deep); }
+.bcard-btn.edit.save:hover { background: var(--accent-container); }
+.bcard-btn.del:hover { background: var(--danger-container); color: var(--danger); }
+.bcard-btn.del.confirm {
+  color: var(--danger); font-weight: 700;
+  animation: confirmPulse .3s ease;
+}
+.bcard-btn.del.confirm:hover { background: var(--danger-container); }
+@keyframes confirmPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+
+/* ---------- 文件夹卡片：与书签卡片同网格，用一层淡强调底区分 ---------- */
+.bcard.folder { background: linear-gradient(150deg, var(--surface-2) 0%, var(--accent-container) 190%); }
+.bcard.folder .bcard-name { font-weight: 600; }
+.bcard.folder .bcard-sub { -webkit-line-clamp: 1; color: var(--fg-dim); }
+
+/* ---------- 就地编辑态：输入框精确复用被替换文本的盒子，卡片零位移 ---------- */
+.bcard.editing { cursor: default; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-container); }
+.bcard-input {
+  display: block; width: 100%; margin: 0; padding: 0 6px; height: 1.45em;
+  border: 0; border-radius: 6px; outline: none;
+  background: var(--accent-container); color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--accent-container-strong);
+  font-family: inherit; box-sizing: border-box;
+  transition: background-color .15s, box-shadow .15s;
+}
+.bcard-input-title { font-size: 13.5px; font-weight: 600; }
+.bcard-input-url { font-size: 12px; height: 1.45em; }
+.bcard-input:focus { background: var(--accent-container-strong); box-shadow: inset 0 0 0 1px var(--accent); }
+.bcard.editing .bcard-sub { -webkit-line-clamp: 1; }
+
+/* ---------- 视图切换（动作行右侧 / 搜索页范围栏） ---------- */
+/* 与旁边 .actions 那颗胶囊同尺寸同圆角；关键是不被父级 flex 拉伸（否则高≠宽，
+   「选中」那枚会变成上下顶格、左右留白的竖胶囊 —— 就是内边距看着不一致的根源）。 */
+.viewseg {
+  position: relative; flex: none; align-self: center; margin-left: auto;
+  display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 19px;
+  background: var(--tint);
+}
+/* 滑动指示块：与顶栏导航胶囊同一套动画（左/宽过渡） */
+.viewseg-ind {
+  position: absolute; top: 3px; bottom: 3px; left: 3px; width: 0;
+  border-radius: 16px; background: var(--accent-container); pointer-events: none;
+  transition: left .28s cubic-bezier(.25, .8, .25, 1), width .28s cubic-bezier(.25, .8, .25, 1);
+}
+.viewseg .iconbtn {
+  position: relative; z-index: 1; flex: none;
+  width: 32px; height: 32px; border-radius: 16px;
+  color: var(--fg-faint); background: transparent;
+}
+.viewseg .iconbtn:hover { background: var(--tint-strong); color: var(--fg); }
+.viewseg .iconbtn.on { color: var(--fg); }
+.viewseg .iconbtn.on:hover { background: transparent; }
+
+/* ---------- 框选矩形 ---------- */
+.marquee {
+  position: fixed; z-index: 55; pointer-events: none;
+  border: 1px solid var(--accent); background: var(--accent-container); border-radius: 4px;
+  opacity: .7;
+}
