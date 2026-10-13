@@ -310,6 +310,17 @@ export function wire() {
     runSearch(false);
   });
 
+  // 一键配对：向本机中枢索取端口与令牌并落存，省掉手抄。失败仍可回到手填。
+  $("#btnCfgPair").addEventListener("click", async () => {
+    $("#cfgStatus").textContent = "正在向本机中枢索取端口与令牌…";
+    try {
+      const r = await op("sys.bridge.pair");
+      $("#cfgStatus").textContent = r.connected ? "已连接 " + r.url : "未连接：" + (r.lastError || "请确认 mcp 中枢已启动");
+      await refreshCfgStatus();
+      pollBridge();
+    } catch (e) { $("#cfgStatus").textContent = "配对失败：" + ((e && e.message) || e); }
+  });
+
   $("#btnCfgSave").addEventListener("click", async () => {
     try {
       await chrome.storage.local.set({

@@ -61,8 +61,15 @@ await new Promise((res) => ext.once("message", res)); // welcome
 
 const tools = await client.listTools();
 const names = tools.tools.map((t) => t.name);
-ok("tools/list 返回 10 个工具", names.length === 10, names.join(", "));
+ok("tools/list 返回 12 个工具", names.length === 12, names.join(", "));
 ok("包含 bookmark_remove / bookmark_undo_last", names.includes("bookmark_remove") && names.includes("bookmark_undo_last"));
+ok("包含批量工具 bookmark_move_many / bookmark_create_many",
+   names.includes("bookmark_move_many") && names.includes("bookmark_create_many"));
+
+const pairRes = await fetch(`http://127.0.0.1:${PORT + 1}/pair.json`).catch(() => null);
+const pairData = pairRes && pairRes.ok ? await pairRes.json() : null;
+ok("一键配对端可读（把端口与令牌交给扩展）",
+   !!pairData && pairData.token === TOKEN && pairData.port === PORT, JSON.stringify(pairData));
 
 const r1 = await client.callTool({ name: "bridge_status", arguments: {} });
 ok("bridge_status 全链路（stdio→中枢→扩展→回）", !r1.isError && r1.content[0].text.includes("\"connected\": true"));

@@ -220,7 +220,8 @@ function el(sel, parent) {
 
   const stv = el("section#settingsview.settingsview");
   const c1 = el("div.spanel", stv);
-  el("input#cfgPort", c1); el("input#cfgToken", c1); el("button#btnCfgSave", c1); el("button#btnCfgReconnect", c1);
+  el("input#cfgPort", c1); el("input#cfgToken", c1); el("button#btnCfgPair", c1);
+  el("button#btnCfgSave", c1); el("button#btnCfgReconnect", c1);
   el("span#cfgStatus", c1);
   el("div[data-theme-set=auto]", c1); el("div[data-theme-set=light]", c1); el("div[data-theme-set=dark]", c1);
   el("span#cfgExtId", c1); el("span#cfgOrigin", c1);

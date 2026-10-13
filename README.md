@@ -21,7 +21,8 @@
   - `ui/options.html` + `ui/options.js` — 设置入口（重定向到管理器页内的设置视图，同页切换）
 - `mcp/` — AI 接入（Node）
   - `src/server.js` — 对 Agent 暴露 MCP（stdio）；对本机扩展暴露 WS 中枢（127.0.0.1 + token + Origin 白名单）
-  - `src/tools.js` — 10 个工具定义（薄转发到扩展 ops）
+  - `src/pair.js` — 一键配对端：只绑 127.0.0.1 的小 HTTP 服务，把端口与令牌交给扩展，免去手抄
+  - `src/tools.js` — 12 个工具定义（薄转发到扩展 ops）
 
 ## 安全设计
 
@@ -30,7 +31,8 @@
 3. 安全网是**不可见**的：每个写操作的前像存在扩展自己的存储里（不进入你的书签），「撤销上一步」可回放恢复。
    （注：删除的回放=重建条目，浏览器会分配新 id；标题/URL/所在位置与原样一致。）
 4. 桥只绑 `127.0.0.1`，令牌 + Origin 白名单（扩展 ID 已由 manifest key 固定：`abcdefghijklmnopabcdefghijklmnop`）。
-5. 权限最小化：只申请 `bookmarks / alarms / storage / favicon`（`favicon` 用于读取本地缓存的站点图标，不发外部请求）。
+   一键配对端同样只绑 `127.0.0.1`，且**只在用户点「一键配对」时**才被扩展读取——不做静默采用，免得本机上别的服务占住这个端口就能把扩展引到别处。
+5. 权限最小化：只申请 `bookmarks / alarms / storage / favicon`（`favicon` 用于读取本地缓存的站点图标，不发外部请求），外加一条 `host_permissions` 只放行 `http://127.0.0.1/*`（供一键配对取令牌）。
 
 ## 快速开始
 
@@ -38,7 +40,8 @@
    （扩展 ID 应显示为 `abcdefghijklmnopabcdefghijklmnop`，与 `mcp/config.example.json` 的 allowedOrigins 一致。）
 2. **启动中枢**：`cd mcp && npm install && npm start`
    首次启动自动生成 `config.json`（含 token），日志里会提示路径。
-3. **填令牌**：扩展图标右键 → 选项 → 端口 `19127` + 粘贴 `config.json` 里的 token → 保存并重连。
+3. **配对**：打开管理器页 → 设置 → 桥 → 点「一键配对」，端口与令牌自动填入。
+   （不方便时也可手填：端口 `19127` + 粘贴 `config.json` 里的 token → 保存并重连。）
 4. **注册 MCP**（Qoder 等宿主）：
    ```json
    { "mcpServers": { "bookmarkpocket": { "command": "node", "args": ["<path-to-this-repo>\\mcp\\src\\server.js"] } } }
@@ -47,7 +50,7 @@
 
 ## 状态
 
-已实现：统一通道（UI/Agent 同一管线）、树/搜索/增/改/移/删（直接删除）、撤销回放、操作日志、10 个 MCP 工具、四个冒烟测试。
+已实现：统一通道（UI/Agent 同一管线）、树/搜索/增/改/移/删（直接删除）、撤销回放、操作日志、12 个 MCP 工具（含批量移动/批量新建）、一键配对、四个冒烟测试。
 代码组织：管理页逻辑按职责拆在 `ui/src/` 下 16 个模块，入口只有 17 行；最大的文件是 340 行的 `boot.js`（纯接线，无逻辑）。模块间不共享 `let`，可变的跨模块状态统一挂在 `state.js` 的 `S` 对象上（ESM 的 import 绑定不可赋值，所以只能这样），其余一律走 `export` / `import`。
 管理器 UI（面板位置与操作逻辑对齐 LinkPocket，视觉为自有方案）：顶栏品牌 + 胶囊导航 / ←→↑ 导航 + 可点面包屑 / 动作行（新建文件夹 · 新建书签 · 重命名 · 删除）/ 左树 210 + 中列表（名称 · 网址 · 添加时间，可排序）+ 右详情栏 286（可拖 230–400）/ 状态栏（共 N 项 + 已选中胶囊）。
 交互：单击单选 / Ctrl 翻转 / Shift 区间 / 点空白或 Esc 取消 / 慢速再击=行内改名 / 双击或 Enter 打开 / F2 改名 / F5 刷新 / Ctrl+Shift+N 新建 / Ctrl+Z 撤销 / Backspace 后退；删除走确认弹窗，新建书签为覆盖层编辑器；全局搜索页（Ctrl+F）。

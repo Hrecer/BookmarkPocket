@@ -99,6 +99,22 @@ export async function connect() {
   };
 }
 
+// 一键配对：扩展是沙箱，读不到磁盘上的 mcp/config.json，所以由中枢开一个只绑 127.0.0.1 的
+// 端点把「端口 + 令牌」直接交出来。只在用户点「一键配对」时调用——不做静默采用，
+// 免得本机上随便一个服务占住这个端口就能把扩展引到别处去。
+export async function pair() {
+  const cfg = await config();
+  const url = `http://127.0.0.1:${cfg.port + 1}/pair.json`;
+  let res;
+  try { res = await fetch(url, { cache: "no-store" }); }
+  catch (e) { throw new Error("连不上本机中枢 " + url + "：" + ((e && e.message) || e)); }
+  if (!res.ok) throw new Error("中枢没应答（HTTP " + res.status + "）");
+  const data = await res.json().catch(() => null);
+  if (!data || !data.token) throw new Error("中枢返回里没有令牌");
+  await chrome.storage.local.set({ [K.port]: Number(data.port) || cfg.port, [K.token]: String(data.token) });
+  return await reconnect();
+}
+
 export async function reconnect() {
   try { ws && ws.close(); } catch (e) { /* ignore */ }
   ws = null;

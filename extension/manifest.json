@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "书签管理器（人机共用同一条操作管线）+ Agent 控制通道",
   "permissions": ["bookmarks", "alarms", "storage", "favicon"],
+  "host_permissions": ["http://127.0.0.1/*"],
   "background": { "service_worker": "background.js", "type": "module" },
   "action": { "default_title": "BookmarkPocket 书签管理器" },
   "options_page": "ui/options.html",

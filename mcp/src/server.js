@@ -10,6 +10,7 @@ import { WebSocketServer, WebSocket as WSClient } from "ws";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { TOOLS } from "./tools.js";
+import { startPairServer } from "./pair.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = process.env.BOOKMARKPOCKET_CONFIG || path.join(HERE, "..", "config.json");
@@ -27,6 +28,7 @@ function loadConfig() {
   }
   cfg.port = Number(cfg.port) || 19127;
   cfg.controlPort = Number(process.env.BOOKMARKPOCKET_CONTROL_PORT) || Number(cfg.controlPort) || cfg.port + 2;
+  cfg.pairPort = Number(process.env.BOOKMARKPOCKET_PAIR_PORT) || Number(cfg.pairPort) || cfg.port + 1;
   cfg.allowedOrigins = Array.isArray(cfg.allowedOrigins) ? cfg.allowedOrigins : [];
   if (!cfg.token) {
     cfg.token = crypto.randomBytes(24).toString("base64url");
@@ -39,6 +41,10 @@ function loadConfig() {
 }
 
 const cfg = loadConfig();
+
+/* ---------- 一键配对端：把端口与令牌交给扩展（免手抄） ---------- */
+
+startPairServer(cfg, log);
 
 /* ---------- WS 中枢：扩展连到这里 ---------- */
 

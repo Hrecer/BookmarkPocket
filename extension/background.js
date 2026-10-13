@@ -7,6 +7,7 @@ import { K } from "./src/keys.js";
 defineOps({
   "sys.bridge.status": { fn: async () => bridge.getState() },
   "sys.bridge.reconnect": { fn: async () => { await bridge.reconnect(); return bridge.getState(); } },
+  "sys.bridge.pair": { fn: async () => bridge.pair() },
 });
 
 function boot() {

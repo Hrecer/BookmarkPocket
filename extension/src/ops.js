@@ -182,6 +182,36 @@ const OPS = {
     },
   },
 
+  // 批量新建：一次调用建一批（有 url 建书签，无 url 建文件夹），只记一笔操作日志。
+  // 单项失败不中断整批，失败项原样回报。
+  "bookmark.createMany": {
+    mutating: true,
+    fn: async ({ parentId, items } = {}) => {
+      if (!parentId) throw new Error("缺少 parentId");
+      const list = Array.isArray(items) ? items : [];
+      if (!list.length) throw new Error("items 不能为空");
+      const created = [];
+      const failed = [];
+      for (const it of list) {
+        try {
+          const spec = { parentId, title: (it && it.title) || "" };
+          if (it && it.url) spec.url = String(it.url);
+          const made = await bm().create(spec);
+          created.push({ id: made.id, title: made.title || "", url: made.url || null });
+        } catch (e) {
+          failed.push({ title: (it && it.title) || "", error: String((e && e.message) || e) });
+        }
+      }
+      invalidateTree();
+      return {
+        created,
+        failed,
+        summary: `批量新建 ${created.length} 项`,
+        undo: { kind: "deleteCreated", ids: created.map((c) => c.id) },
+      };
+    },
+  },
+
   "bookmark.update": {
     mutating: true,
     fn: async ({ id, title, url } = {}) => {

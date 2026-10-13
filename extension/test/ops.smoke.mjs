@@ -219,7 +219,26 @@ function ok(name, cond, extra = "") {
      `a=${a2 && a2.parentId} b=${b2 && b2.parentId}`);
 }
 
-// 14. 复制（整棵文件夹 + 单条链接）+ 撤销
+// 14. 批量新建 + 撤销
+{
+  const r = await execute("bookmark.createMany", {
+    parentId: ids.barId,
+    items: [{ title: "批建文件夹" }, { title: "批建书签", url: "https://many.example/" }],
+  });
+  const madeFolder = r.created.find((c) => c.title === "批建文件夹");
+  const madeLink = r.created.find((c) => c.title === "批建书签");
+  const folderNode = madeFolder && (await execute("bookmark.get", { id: madeFolder.id })).node;
+  const linkNode = madeLink && (await execute("bookmark.get", { id: madeLink.id })).node;
+  ok("批量新建（文件夹 + 书签一次建好）",
+     r.created.length === 2 && r.failed.length === 0 && folderNode && !folderNode.url && linkNode && linkNode.url === "https://many.example/",
+     JSON.stringify(r.failed));
+  await execute("bookmark.undoLast", {});
+  const left = (await execute("bookmark.search", { query: "many.example" })).count;
+  const folderGone = madeFolder && (await execute("bookmark.get", { id: madeFolder.id })).node;
+  ok("批量新建 + 撤销（整批移除）", left === 0 && folderGone === null);
+}
+
+// 15. 复制（整棵文件夹 + 单条链接）+ 撤销
 {
   const tree0 = (await execute("bookmark.tree", {})).tree[0];
   let newsFolder = null;

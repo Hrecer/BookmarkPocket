@@ -44,6 +44,17 @@ export const TOOLS = [
     },
   },
   {
+    name: "bookmark_create_many",
+    description: "批量新建：一次调用在同一文件夹下建多个条目（有 url 建书签，无 url 建文件夹），整批只记一笔撤销",
+    op: "bookmark.createMany",
+    shape: {
+      parentId: z.string().describe("所在文件夹 id"),
+      items: z
+        .array(z.object({ title: z.string().optional(), url: z.string().optional() }))
+        .describe("要新建的条目列表；带 url 建书签，不带 url 建文件夹"),
+    },
+  },
+  {
     name: "bookmark_update",
     description: "修改书签/文件夹的标题或 URL",
     op: "bookmark.update",
@@ -54,6 +65,16 @@ export const TOOLS = [
     description: "移动书签/文件夹到指定文件夹（可指定位置 index）",
     op: "bookmark.move",
     shape: { id: z.string(), parentId: z.string(), index: z.number().optional() },
+  },
+  {
+    name: "bookmark_move_many",
+    description: "批量移动：一次调用把多个书签/文件夹移到同一目标文件夹，整批只记一笔撤销（要比逐条调 bookmark_move 快得多）",
+    op: "bookmark.moveMany",
+    shape: {
+      ids: z.array(z.string()).describe("要移动的 id 列表"),
+      parentId: z.string().describe("目标文件夹 id"),
+      chunk: z.number().optional().describe("并发分块大小，默认 64，上限 256"),
+    },
   },
   {
     name: "bookmark_remove",
