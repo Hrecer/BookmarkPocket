@@ -20,6 +20,23 @@ let internal = 0;
 
 export function isInternalWrite() { return internal > 0; }
 
+// 我们自己写过的书签：记「这是我们的动作，写进去时父目录是谁」。
+// 书签事件是异步派发的，处理器跑起来时 internal 计数可能已经归零，所以要在事件里认领自己那一下。
+// 认领口径是父目录，不能只按 id 一刀切：那样会把浏览器随后对同一条书签的挪动也当成自己的而漏掉。
+const selfWrites = new Map();
+
+function markSelf(ids, parentId) {
+  const ts = Date.now();
+  for (const id of [].concat(ids)) selfWrites.set(String(id), { parentId: String(parentId), ts });
+}
+
+export function isSelfWrite(id, parentId) {
+  const r = selfWrites.get(String(id));
+  if (!r) return false;
+  if (Date.now() - r.ts > 10000) { selfWrites.delete(String(id)); return false; }
+  return parentId !== undefined && parentId !== null && String(parentId) === r.parentId;
+}
+
 export function execute(op, args = {}) {
   const p = tail.then(async () => {
     internal++;
@@ -47,6 +64,11 @@ async function pushLog(entry) {
   log.push(entry);
   while (log.length > LOG_CAP) log.shift();
   await st().set({ [K.oplog]: log });
+}
+
+// 只留痕、不带撤销：给「不是我们发起的变动」和归位判定用（谁在什么时候把哪条书签挪到了哪）。
+export async function note(op, summary) {
+  await pushLog({ ts: Date.now(), op, args: {}, summary, undo: null });
 }
 
 async function readLog() {
@@ -111,9 +133,11 @@ async function restoreSnapshot(nodes) {
     try { alive = !!(await bm().get(n.id))[0]; } catch (e) { alive = false; }
     if (alive) {
       try { await bm().move(n.id, { parentId, index: n.index }); } catch (e) { /* 尽力恢复 */ }
+      markSelf(n.id, parentId);
       remap.set(n.id, n.id);
     } else {
       const c = await bm().create({ parentId, index: n.index, title: n.title, url: n.url || undefined });
+      markSelf(c.id, parentId);
       remap.set(n.id, c.id);
     }
   }
@@ -183,6 +207,7 @@ const OPS = {
       if (url) spec.url = url;
       if (index !== undefined) spec.index = index;
       const created = await bm().create(spec);
+      markSelf(created.id, parentId);
       invalidateTree();
       return {
         created,
@@ -212,6 +237,7 @@ const OPS = {
           failed.push({ title: (it && it.title) || "", error: String((e && e.message) || e) });
         }
       }
+      markSelf(created.map((c) => c.id), parentId);
       invalidateTree();
       return {
         created,
@@ -248,13 +274,17 @@ const OPS = {
       if (!id || !parentId) throw new Error("缺少 id 或 parentId");
       const before = (await bm().get(id))[0];
       if (!before) throw new Error("书签不存在: " + id);
+      // 日志里要写清「搬到哪」：缓存还没失效，顺手取目标文件夹的完整路径
+      const to = indexById(await ensureTree(false)).get(String(parentId));
       const spec = { parentId };
       if (index !== undefined) spec.index = index;
+      // 先记账再搬：书签事件可能在 await 期间就派发出来，晚一步记会把自己的移动当成外部移动
+      markSelf(id, parentId);
       await bm().move(id, spec);
       invalidateTree();
       return {
         moved: id,
-        summary: `移动：${before.title || before.id}`,
+        summary: `移动：${before.title || before.id} → ${to ? to.path : parentId}`,
         undo: { kind: "move", id, before: { parentId: before.parentId, index: before.index } },
       };
     },
@@ -280,6 +310,7 @@ const OPS = {
       }
       let moved = 0;
       const failed = [];
+      markSelf(list, parentId);
       const size = Math.max(1, Math.min(Number(chunk) || 64, 256));
       for (let i = 0; i < moves.length; i += size) {
         await Promise.all(moves.slice(i, i + size).map(async (m) => {
@@ -311,6 +342,7 @@ const OPS = {
         const spec = { parentId: targetParent, title: node.title || "" };
         if (node.url) spec.url = node.url;
         const made = await bm().create(spec);
+        markSelf(made.id, targetParent);   // 整棵子树都算我们写的，别被归位再搬一次
         copied++;
         if (!node.url) for (const c of node.children || []) await copyInto(c, made.id);
         return made.id;
@@ -319,6 +351,7 @@ const OPS = {
         try { created.push(await copyInto(n, parentId)); }
         catch (e) { failed.push({ id: n.id, error: String((e && e.message) || e) }); }
       }
+      markSelf(created, parentId);
       invalidateTree();
       return { copied, failed, created, summary: `复制 ${copied} 项`, undo: { kind: "deleteCreated", ids: created } };
     },
@@ -364,9 +397,11 @@ const OPS = {
         await restoreSnapshot(u.nodes);
       } else if (u.kind === "move") {
         await bm().move(u.id, { parentId: u.before.parentId, index: u.before.index });
+        markSelf(u.id, u.before.parentId);
       } else if (u.kind === "moveMany") {
         for (const m of u.moves) {
           try { await bm().move(m.id, { parentId: m.parentId, index: m.index }); } catch (e) { /* 尽力 */ }
+          markSelf(m.id, m.parentId);
         }
       } else if (u.kind === "update") {
         const dir = { title: u.before.title };

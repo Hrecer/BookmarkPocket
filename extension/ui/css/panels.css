@@ -96,16 +96,17 @@
 .rulesview .tbtn:hover:not(:disabled) { background: var(--tonal-strong); }
 .rulesview .tbtn.danger { color: var(--danger); }
 .rulesview .tbtn.danger:hover:not(:disabled) { background: var(--danger-container); }
+/* 选目标文件夹：行直接复用左栏那套（.tnode/.tchev/.tico/.tname），
+   这里只把绝对定位改回流式、长名字收成省略号，免得横向溢出。
+   默认收起，展开由 chevron 控制，目录再多也不怕。 */
+#pickOverlay { z-index: 60; }
 .picklist {
   max-height: 46vh; overflow: auto; margin-top: 12px;
   border: 1px solid var(--line); border-radius: 14px; padding: 6px;
 }
-.pickrow {
-  padding: 7px 10px; border-radius: 9px; font-size: 13px; cursor: pointer;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.pickrow:hover { background: var(--tint); }
-.pickrow.on { background: var(--accent-container); font-weight: 600; }
+.picklist .tnode { position: static; width: auto; min-width: 0; height: 30px; padding-right: 10px; }
+.picklist .tname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.picklist .tnode.leaf .tico { color: var(--fg-faint); }
 
 .fade { transition: opacity .16s ease; }
 .fade.hide { opacity: 0; }

@@ -273,6 +273,7 @@ const bookmarkTree = {
 };
 const storage = {};
 const calls = [];
+let rulesCfg = { enabled: true, fallback: { enabled: true, path: "收藏夹栏" }, list: [] };
 const chrome = {
   runtime: {
     id: "test-ext-id",
@@ -290,8 +291,8 @@ const chrome = {
         case "bookmark.remove": return { ok: true, data: { removed: (A.ids || []).length } };
         case "bookmark.move": return { ok: true, data: { moved: (A.ids || []).length } };
         case "bookmark.undo_last": return { ok: true, data: { undone: "bookmark.create" } };
-        case "rules.get": return { ok: true, data: { enabled: true, fallback: { enabled: true, path: "收藏夹栏" }, list: [] } };
-        case "rules.set": return { ok: true, data: Object.assign({ enabled: true, fallback: { enabled: true, path: "收藏夹栏" }, list: [] }, A.config) };
+        case "rules.get": return { ok: true, data: rulesCfg };
+        case "rules.set": return { ok: true, data: (rulesCfg = Object.assign({ enabled: true, fallback: { enabled: true, path: "收藏夹栏" }, list: [] }, A.config)) };
         default: return { ok: true, data: {} };
       }
     },
@@ -452,6 +453,31 @@ if (M) {
   ok($id("cfgPort").value === 19127, "端口读回（" + $id("cfgPort").value + "）");
   ok($id("cfgToken").value === "TOKEN-XYZ", "令牌读回");
   ok($id("cfgExtId").textContent === "test-ext-id", "扩展 ID 回填");
+
+  console.log("\n— 规则页：选目标文件夹 —");
+  // 桩 DOM 不解析文本节点，按行认：1=书签栏 2=其他书签 10=书签栏下的「技术」
+  const pickIds = () => $id("pickList").querySelectorAll(".tnode").map((r) => r.dataset["data-pick-id"] || r.dataset.pickId || "");
+  await M.refreshRulesUI();
+  await M.openRulesPicker("fallback");
+  ok(pickIds().join(",") === "1,2", "默认收起，只列顶层（" + pickIds().join(",") + "）");
+  M.pickToggle("1");
+  ok(pickIds().join(",") === "1,10,2", "点箭头才展开子文件夹（" + pickIds().join(",") + "）");
+  M.pickToggle("1");
+  ok(pickIds().join(",") === "1,2", "再点箭头收回去（" + pickIds().join(",") + "）");
+
+  // 切到嵌套路径：那一支的祖先要自动展开，当前项高亮并滚进视野
+  await M.op("rules.set", { config: { enabled: true, fallback: { enabled: true, path: "书签栏 > 技术" }, list: [] } });
+  await M.refreshRulesUI();
+  await M.openRulesPicker("fallback");
+  ok(pickIds().join(",") === "1,10,2", "目标那支自动展开（" + pickIds().join(",") + "）");
+  ok($id("pickList").querySelectorAll(".tnode.current").length === 1, "当前目标高亮一行");
+  M.pickChoose("10");
+  ok($id("pickPath").textContent === "书签栏 > 技术", "选中后回显完整路径（" + $id("pickPath").textContent + "）");
+
+  // 规则编辑器：「从书签树里选」的动作名曾与行的勾选撞车，点下去是死的
+  M.openEditor(null);
+  await M.openRulesPicker("rule");
+  ok($id("pickTitle").textContent === "规则的目标文件夹", "编辑器里也能打开文件夹选择");
 }
 
 // 结构守护：入口必须是薄壳，逻辑按模块拆开，且每个模块都真的被引用到

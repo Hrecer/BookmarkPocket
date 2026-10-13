@@ -2,6 +2,7 @@
 
 import { S, expanded, parentOf, recLinks, tPool } from "./state.js";
 import { ICON, T_ROW_H, fmt, treeEl, trowsEl, tspacer } from "./dom.js";
+import { visibleRows } from "./treewalk.js";
 import { startRenameSelected } from "./edit.js";
 import { cutClass, setRowIcon, syncSelection } from "./list.js";
 import { goTo, navigate, scrollIdIntoView } from "./nav.js";
@@ -9,15 +10,7 @@ import { isFixedRoot, showCtxMenu, startDragCandidate } from "./transfer.js";
 import { applyWindow, windowBounds } from "./virtual.js";
 
 export function buildTreeRows() {
-  const out = [];
-  (function walk(kids, depth) {
-    for (const n of kids) {
-      const isFolder = !n.url;
-      out.push({ node: n, depth, isFolder });
-      if (isFolder && expanded.has(n.id)) walk(n.children || [], depth + 1);
-    }
-  })(S.treeRoots, 0);
-  return out;
+  return visibleRows(S.treeRoots, expanded);
 }
 
 export function makeTreeRow() {

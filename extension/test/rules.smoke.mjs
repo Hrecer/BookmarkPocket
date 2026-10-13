@@ -1,7 +1,7 @@
 // 规则引擎冒烟：匹配语义、优先级与兜底、脏数据归一、以及「收藏一落地就归位」。
 // 跑法：node extension/test/rules.smoke.mjs
 import { execute, defineOps, invalidateTree, isInternalWrite } from "../src/ops.js";
-import { normalize, matches, pickTarget, read, write, autoRoute } from "../src/rules.js";
+import { normalize, matches, pickTarget, read, write, autoRoute, settleMove } from "../src/rules.js";
 
 function makeChrome() {
   let seq = 1;
@@ -160,6 +160,63 @@ const base = normalize({
   const r = await autoRoute(id, { id, url: "https://sub.test.example/mod/9", parentId: ids.barId });
   const n = (await execute("bookmark.get", { id })).node;
   ok("总开关关掉：新收藏原地不动", r === null && n && n.parentId === ids.barId);
+}
+
+// 8. 浏览器自己挪的书签，也按规则摆回去
+{
+  await write({
+    enabled: true,
+    fallback: { enabled: true, path: "收藏夹栏" },
+    list: [{ match: { type: "host", value: "test.example" }, target: "收藏夹栏 > 示例分类 > 子目录" }],
+  });
+
+  // 原生移动：只改 parentId，不经 ops（收藏弹窗里改文件夹后确认 / 原生管理器拖动都长这样）
+  const id = addExternal(ids.barId, "被浏览器挪走的", "https://sub.test.example/mod/2");
+  await chrome.bookmarks.move(id, { parentId: ids.catId });
+  invalidateTree();
+  const p = await settleMove(id);
+  const n = (await execute("bookmark.get", { id })).node;
+  ok("浏览器挪到错的地方：按规则摆回去",
+     p === "收藏夹栏 > 示例分类 > 子目录" && n && n.parentId !== ids.catId,
+     `p=${p} parent=${n && n.parentId}`);
+
+  // 我们自己搬的（管理器里拖动 / 撤销）：位置是用户明确指定的，规则不抢
+  const id2 = addExternal(ids.barId, "我们自己搬的", "https://sub.test.example/mod/3");
+  await execute("bookmark.move", { id: id2, parentId: ids.catId });
+  const r2 = await settleMove(id2, ids.catId);
+  const n2 = (await execute("bookmark.get", { id: id2 })).node;
+  ok("我们自己搬的书签：规则不抢回去",
+     r2 === null && n2 && n2.parentId === ids.catId,
+     `r=${r2} parent=${n2 && n2.parentId}`);
+
+  // 同一条书签随后又被浏览器挪走：不能因为我们刚搬过它就放过
+  await chrome.bookmarks.move(id2, { parentId: ids.barId });
+  invalidateTree();
+  const r3 = await settleMove(id2, ids.barId);
+  const n3 = (await execute("bookmark.get", { id: id2 })).node;
+  ok("随后被浏览器挪走：照样按规则摆回去",
+     r3 === "收藏夹栏 > 示例分类 > 子目录" && n3 && n3.parentId !== ids.barId,
+     `r=${r3} parent=${n3 && n3.parentId}`);
+
+  // 归位要留痕：外部移动、以及「已在位」的判定，都要能在日志里查到
+  const tail = await execute("log.tail", { n: 20 });
+  const sums = tail.entries.map((e) => e.summary || "");
+  ok("外部移动写进了操作日志",
+     tail.entries.some((e) => e.op === "rules.settle" && e.summary.indexOf("外部移动") === 0),
+     sums.join(" | "));
+  ok("「已在位」的判定也留痕",
+     tail.entries.some((e) => e.op === "rules.route" && e.summary.indexOf("归位检查") === 0),
+     sums.join(" | "));
+
+  // 复制出来的整棵子树也是「我们写的」：里面的叶子不该被规则再搬走
+  const pack = addExternal(ids.catId, "整包", null);
+  const inner = addExternal(pack, "包里的条目", "https://sub.test.example/inside");
+  invalidateTree();
+  await execute("bookmark.copy", { ids: [pack], parentId: ids.barId });
+  const hit = (await execute("bookmark.search", { query: "包里的条目" })).hits.find((h) => h.id !== inner);
+  const cn = hit && (await execute("bookmark.get", { id: hit.id })).node;
+  const rc = cn ? await autoRoute(cn.id, cn) : "no-copy";
+  ok("复制出来的子树：叶子不会被规则再搬走", rc === null, `r=${rc} hit=${hit && hit.id}`);
 }
 
 console.log(`\n${pass}/${pass + fail} 通过`);

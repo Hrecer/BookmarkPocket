@@ -6,7 +6,7 @@
 // 匹配是纯函数，存储读写也在这一层；不碰 DOM，写操作一律走 ops（可撤销、有日志）。
 
 import { K } from "./keys.js";
-import { execute, isInternalWrite } from "./ops.js";
+import { execute, isSelfWrite, note } from "./ops.js";
 
 const DEFAULT_PATH = "收藏夹栏";
 
@@ -99,14 +99,31 @@ function findById(node, id) {
 // 新书签落到哪。返回目标路径（用于日志/回报），没动则 null。
 export async function autoRoute(id, node) {
   if (!node || !node.url) return null;        // 文件夹不参与
-  if (isInternalWrite()) return null;         // 我们自己建的（管理器 UI / Agent），已经指明位置
+  // 我们自己写进去的（管理器 UI / Agent / 撤销 / 复制）位置是明确指定的，不归位。
+  // 只认「我们刚写进那个父目录」这一下——按「有操作在跑」一刀切会误伤浏览器随后发来的移动事件。
+  if (isSelfWrite(id, node.parentId)) return null;
   const cfg = await read();
   const path = pickTarget(cfg, node.url);
   if (!path) return null;
   const parentId = await folderIdByPath(path);
   if (!parentId) return null;
   const cur = (await execute("bookmark.get", { id })).node;
-  if (!cur || cur.parentId === parentId) return null;
+  if (!cur || cur.parentId === parentId) {
+    // 已经在该在的地方：也留一笔，否则「它怎么又跑到那去了」根本查不出来
+    if (cur) await note("rules.route", `归位检查：${cur.title || cur.id} 已在 ${cur.path || path}`);
+    return null;
+  }
   await execute("bookmark.move", { id, parentId });
   return path;
+}
+
+// 浏览器自己把书签挪了地方（收藏弹窗里改文件夹后确认 / 原生收藏管理器里拖动）：这类移动
+// 只发 onMoved、不发 onCreated，不接住的话书签就留在错的地方，看着像兜底没生效。
+// parentId 是事件里报的新父目录——用它认领「这一下是不是我们自己搬的」。
+export async function settleMove(id, parentId) {
+  if (isSelfWrite(id, parentId)) return null;
+  const cur = (await execute("bookmark.get", { id })).node;
+  if (!cur || !cur.url) return null;
+  await note("rules.settle", `外部移动：${cur.title || cur.id} → ${cur.path || parentId}`);
+  return autoRoute(id, cur);
 }

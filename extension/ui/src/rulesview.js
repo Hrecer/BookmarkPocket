@@ -6,6 +6,7 @@ import { $, ICON } from "./dom.js";
 import { op } from "./chan.js";
 import { esc } from "./details.js";
 import { switchView } from "./search.js";
+import { visibleRows, flatFolders } from "./treewalk.js";
 
 const TYPE_LABEL = { host: "域名", url: "网址片段" };
 
@@ -183,31 +184,69 @@ function onDragEnd() {
 
 /* ---------- 目标文件夹选择 ---------- */
 
-async function openPicker(kind) {
+// 默认收起、按需展开：目录再多也只是一屏顶层。行本身复用左栏那套
+// （visibleRows + .tnode/.tchev/.tico/.tname），只是不吃虚拟化。
+// 目标路径上的祖先自动展开，并把当前项滚进视野，省得手动翻。
+export async function openRulesPicker(kind) {
   const t = await op("bookmark.tree");
-  const rows = [];
-  (function walk(nodes, depth) {
-    for (const n of nodes || []) {
-      if (n.url) continue;
-      rows.push(
-        `<div class="pickrow" data-pick-id="${esc(n.id)}" data-pick-path="${esc(n.path || n.title)}" style="padding-left:${10 + depth * 14}px">${esc(n.title)}</div>`
-      );
-      walk(n.children, depth + 1);
-    }
-  })(t.tree[0].children, 0);
-  R.pick = { kind, id: null, path: null };
+  const roots = (t.tree[0] && t.tree[0].children) || [];
+  const cur = pickCurrent(kind);
+  const flat = flatFolders(roots);
+  const open = new Set(
+    flat.filter((f) => cur && (f.path === cur || cur.startsWith(f.path + " > "))).map((f) => f.node.id)
+  );
+  R.pick = { kind, id: null, path: null, cur, roots, flat, open };
   $("#pickTitle").textContent = kind === "fallback" ? "兜底归到这里" : "规则的目标文件夹";
-  $("#pickList").innerHTML = rows.join("");
   $("#pickPath").textContent = "";
+  renderPick();
   $("#pickOverlay").hidden = false;
 }
 
-function choosePickRow(el) {
-  if (!R.pick) return;
-  R.pick.id = el.dataset.pickId;
-  R.pick.path = el.dataset.pickPath;
-  for (const r of $("#pickList").querySelectorAll(".pickrow")) r.classList.toggle("on", r === el);
-  $("#pickPath").textContent = R.pick.path;
+function pickCurrent(kind) {
+  if (kind === "fallback") return String((R.cfg && R.cfg.fallback.path) || "");
+  return String((R.draft && R.draft.target) || "");
+}
+
+function renderPick() {
+  const p = R.pick;
+  if (!p) return;
+  const byId = new Map(p.flat.map((f) => [f.node.id, f]));
+  const rows = visibleRows(p.roots, p.open).filter((r) => r.isFolder);
+  $("#pickList").innerHTML = rows.map((r) => pickRowHTML(r, byId.get(r.node.id) || {}, p)).join("");
+  const sel = $("#pickList").querySelector(".tnode.current");
+  if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: "nearest" });
+}
+
+function pickRowHTML(r, info, p) {
+  const n = r.node;
+  const exp = p.open.has(n.id);
+  const path = info.path || n.title || "";
+  const on = p.id ? p.id === n.id : path === p.cur;
+  return `<div class="tnode folder prow${info.hasKids ? "" : " leaf"}${exp ? " expanded" : ""}${on ? " current" : ""}"`
+    + ` data-pick-id="${esc(n.id)}" data-pick-path="${esc(path)}" data-pick-kids="${info.hasKids ? "1" : ""}"`
+    + ` title="${esc(path)}" style="padding-left:${6 + r.depth * 20}px">`
+    + `<button class="tchev${info.hasKids ? "" : " empty"}" data-pick-chev="${esc(n.id)}" type="button" tabindex="-1">${ICON.chev}</button>`
+    + `<span class="tico">${ICON.folder}</span><span class="tname">${esc(n.title)}</span></div>`;
+}
+
+export function pickToggle(id) {
+  if (!R.pick || !id) return;
+  if (R.pick.open.has(id)) R.pick.open.delete(id);
+  else R.pick.open.add(id);
+  renderPick();
+}
+
+// 选中即展开（和左栏点文件夹的行为一致），选中项留在视野里
+export function pickChoose(id) {
+  const p = R.pick;
+  if (!p || !id) return;
+  const f = p.flat.find((x) => x.node.id === id);
+  if (!f) return;
+  p.id = f.node.id;
+  p.path = f.path;
+  p.open.add(f.node.id);
+  $("#pickPath").textContent = f.path;
+  renderPick();
 }
 
 function closePick() {
@@ -267,7 +306,8 @@ function onAct(act, el) {
   if (act === "rule-all") return toggleAll();
   if (act === "rule-del-sel") return removePicked();
   if (act === "rule-pick") return togglePick(ruleIdOf(el));
-  if (act === "fb-pick") return openPicker("fallback");
+  if (act === "rule-target-pick") return openRulesPicker("rule");
+  if (act === "fb-pick") return openRulesPicker("fallback");
   const id = ruleIdOf(el);
   if (!id) return;
   if (act === "rule-edit") return openEditor(id);
@@ -276,16 +316,17 @@ function onAct(act, el) {
 }
 
 function onClick(e) {
-  const el = e.target.closest("[data-act],[data-rules-switch],[data-fb-switch],[data-pick],[data-rule],[data-rule-type],[data-pick-id]");
+  const el = e.target.closest("[data-act],[data-rules-switch],[data-fb-switch],[data-pick],[data-pick-chev],[data-rule],[data-rule-type],[data-pick-id]");
   if (!el) return;
   const d = el.dataset;
   if (d.act) return onAct(d.act, el);
   if (d.rulesSwitch) return save({ ...R.cfg, enabled: !R.cfg.enabled });
   if (d.fbSwitch) return save({ ...R.cfg, fallback: { ...R.cfg.fallback, enabled: !R.cfg.fallback.enabled } });
+  if (d.pickChev) return pickToggle(d.pickChev);
   if (d.pick) return onPick(d.pick);
   if (d.rule) return onRuleFoot(d.rule);
   if (d.ruleType) { R.draft.type = d.ruleType; syncType(); return; }
-  if (d.pickId) return choosePickRow(el);
+  if (d.pickId) return pickChoose(d.pickId);
 }
 
 export function wireRulesView() {

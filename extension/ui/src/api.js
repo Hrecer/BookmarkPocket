@@ -9,6 +9,7 @@ export { newFolder, openEditor, saveEditor, startRenameSelected } from "./edit.j
 export { applyAllWindows, applyListWindow, clearSel, renderList, selectOne, syncSelection } from "./list.js";
 export { back, forward, goTo, navigate, refresh, renderCrumbs, up } from "./nav.js";
 export { locateRow, renderSearch, runSearch, switchView } from "./search.js";
+export { openRulesPicker, pickChoose, pickToggle, refreshRulesUI } from "./rulesview.js";
 export { applyTheme, cycleTheme, loadSettings, readThemeMode } from "./shell.js";
 export { expandToCurrent } from "./shortcuts.js";
 export { cancelCut, doCopy, doCut, executeTransfer, pasteInto } from "./transfer.js";

@@ -1,6 +1,6 @@
 // Service Worker：装配 操作层 + 桥；UI（runtime 消息）与 Agent（WebSocket）走同一个 execute。
 
-import { execute, defineOps, invalidateTree } from "./src/ops.js";
+import { execute, defineOps, invalidateTree, isInternalWrite } from "./src/ops.js";
 import * as bridge from "./src/bridge.js";
 import * as rules from "./src/rules.js";
 import { K } from "./src/keys.js";
@@ -49,8 +49,16 @@ function onBmEvent(name, args) {
 chrome.bookmarks.onCreated.addListener((id, node) => {
   onBmEvent("onCreated", { id, node });
   // 收藏归位：弹窗里显示的文件夹改不了（那是宿主界面），但书签一落地就能按规则搬正。
+  // 我们自己的写入（管理器新建 / Agent / 复制）在新节点上先于「我们刚写的」标记落地，
+  // 所以这里用标志位挡一下；标志位已清零才到的晚事件，交给 autoRoute 里那层认领。
+  if (isInternalWrite()) return;
   rules.autoRoute(id, node).catch(() => {});
 });
 chrome.bookmarks.onRemoved.addListener((id, info) => onBmEvent("onRemoved", { id, info }));
 chrome.bookmarks.onChanged.addListener((id, info) => onBmEvent("onChanged", { id, info }));
-chrome.bookmarks.onMoved.addListener((id, info) => onBmEvent("onMoved", { id, info }));
+chrome.bookmarks.onMoved.addListener((id, info) => {
+  onBmEvent("onMoved", { id, info });
+  // 浏览器自己挪的（收藏弹窗里改文件夹后确认、原生收藏管理器里拖动）：这种只发 onMoved，
+  // 不管的话书签会一直躺在错的地方，看起来就像兜底没生效。
+  rules.settleMove(id, info && info.parentId).catch(() => {});
+});
