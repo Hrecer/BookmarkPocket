@@ -6,7 +6,7 @@
   overflow-anchor: none;
   /* 面板整体水平居中：定宽块在 .shell（纵向 flex）里默认贴左，
      用 width:100% + margin:0 auto 让左右留白均分 */
-  width: 100%; max-width: 720px; margin: 0 auto;
+  width: 100%; max-width: 1180px; margin: 0 auto;
   display: flex; flex-direction: column; gap: 10px;
   padding: 4px 12px 10px;
 }
@@ -25,7 +25,7 @@
 .rulesview {
   flex: 1; min-height: 0; overflow: auto;
   overflow-anchor: none;
-  width: 100%; max-width: 720px; margin: 0 auto;
+  width: 100%; max-width: 1180px; margin: 0 auto;
   display: flex; flex-direction: column; gap: 10px;
   padding: 4px 12px 10px;
 }
@@ -46,29 +46,56 @@
 .switch.on { background: var(--primary-fill); }
 .switch.on::after { transform: translateX(20px); background: var(--on-primary); }
 
-.rvlist { display: flex; flex-direction: column; gap: 6px; }
+.switch.sm { width: 34px; height: 20px; }
+.switch.sm::after { width: 14px; height: 14px; }
+.switch.sm.on::after { transform: translateX(14px); }
+
+/* 规则表：一行一条，用分隔线而不是一张张卡片；勾选/全选/批量删除都在这条工具行上 */
+.rvbar { gap: 8px; }
+.rvlist { margin-top: 10px; border-top: 1px solid var(--line); }
+/* 选择态：行里只留圆选圈和正文，开关与图标先让位，免得看串 */
+.rvlist.selmode .switch, .rvlist.selmode .rvico { display: none; }
+.rvpick {
+  flex: none; width: 24px; height: 24px; display: grid; place-items: center;
+  padding: 0; border: 0; border-radius: 50%; background: transparent;
+  color: var(--fg-faint); cursor: pointer;
+}
+.rvpick svg { width: 17px; height: 17px; }
+.rvpick:hover { color: var(--fg); }
+.rvpick.on { color: var(--accent); }
 .rvrow {
   display: flex; align-items: center; gap: 8px;
-  min-height: 44px; padding: 6px 12px; border-radius: 18px; background: var(--tint);
+  min-height: 36px; padding: 2px 6px; font-size: 12.5px;
+  border-bottom: 1px solid var(--line);
 }
+.rvrow:last-child { border-bottom: 0; }
+.rvrow:hover { background: var(--tint); }
+.rvrow.picked { background: var(--accent-container); }
 .rvrow.off { opacity: .5; }
-.rvbtn {
-  width: 24px; height: 24px; flex: none; border: 0; border-radius: 8px;
-  background: transparent; color: var(--fg-dim); cursor: pointer; font-size: 13px;
+.rvrow.dragging { opacity: .4; }
+.rvrow.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+.rvrow.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.rvrow { cursor: grab; }
+.rvrow.dragging { cursor: grabbing; }
+.rvico {
+  flex: none; width: 26px; height: 26px; display: grid; place-items: center;
+  border: 0; border-radius: 50%; background: var(--tonal); color: var(--fg-dim); cursor: pointer;
 }
-.rvbtn:hover:not(:disabled) { background: var(--tint-strong); color: var(--fg); }
-.rvbtn:disabled { opacity: .3; cursor: default; }
+.rvico svg { width: 15px; height: 15px; }
+.rvico:hover { background: var(--tonal-strong); color: var(--fg); }
+.rvico.danger:hover { background: var(--danger-container); color: var(--danger); }
 .rvmatch {
-  flex: none; max-width: 46%; font-size: 13px; color: var(--fg-dim);
+  flex: none; max-width: 42%; color: var(--fg-dim);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.rvmatch b { color: var(--fg); font-weight: 600; }
+.rvmatch b { color: var(--fg); font-weight: 500; }
 .rvarrow { color: var(--fg-faint); flex: none; }
-.rvtarget { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rvtarget { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 规则页的按钮一律给底色：光秃秃的文字式按钮在这页看着不像按钮 */
 .rulesview .tbtn { background: var(--tonal); }
 .rulesview .tbtn:hover:not(:disabled) { background: var(--tonal-strong); }
-.rvmini { min-height: 30px; padding: 5px 12px; font-size: 12px; }
+.rulesview .tbtn.danger { color: var(--danger); }
+.rulesview .tbtn.danger:hover:not(:disabled) { background: var(--danger-container); }
 .picklist {
   max-height: 46vh; overflow: auto; margin-top: 12px;
   border: 1px solid var(--line); border-radius: 14px; padding: 6px;

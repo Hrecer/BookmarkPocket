@@ -176,14 +176,7 @@
       <p class="snote">开启后，新收藏的书签会按下面的规则自动归位（Ctrl+D、点星星、拖拽、别的扩展建的都算）。
         浏览器那个收藏弹窗里显示的文件夹扩展改不了——但书签落地的瞬间就会搬到该去的地方。</p>
     </div>
-    <div class="card spanel">
-      <div class="dlabel">规则（自上而下，先命中先用）</div>
-      <div class="rvlist" id="rvList"></div>
-      <div class="srow">
-        <button id="btnRuleAdd" data-act="rule-add" class="tbtn" type="button">＋ 新建规则</button>
-        <span class="dim" id="rvCount"></span>
-      </div>
-    </div>
+
     <div class="card spanel">
       <div class="dlabel">兜底</div>
       <div class="srow">
@@ -192,6 +185,20 @@
         <button id="btnFbPick" data-act="fb-pick" class="tbtn" type="button">改目标文件夹</button>
       </div>
       <p class="snote">没命中任何规则时，全部归到这里（默认收藏夹栏）。</p>
+    </div>
+
+    <div class="card spanel">
+      <div class="dlabel">规则</div>
+      <p class="snote">自上而下逐条匹配，先命中先用。按住整行拖动可以调整顺序。</p>
+      <div class="srow rvbar">
+        <button id="btnRuleAdd" data-act="rule-add" class="tbtn" type="button">＋ 新建规则</button>
+        <button id="btnRulePick" data-act="rule-selmode" class="tbtn" type="button">批量选择</button>
+        <button id="btnRuleAll" data-act="rule-all" class="tbtn" type="button" hidden>全选</button>
+        <button id="btnRuleDel" data-act="rule-del-sel" class="tbtn danger" type="button" hidden>删除选中</button>
+        <button id="btnRuleCancel" data-act="rule-selmode" class="tbtn" type="button" hidden>取消</button>
+        <span class="dim" id="rvCount"></span>
+      </div>
+      <div class="rvlist" id="rvList"></div>
     </div>
   </section>
 

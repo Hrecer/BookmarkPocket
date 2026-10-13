@@ -230,6 +230,8 @@ function el(sel, parent) {
   const rc = el("div.card.spanel", rv);
   el("span#rvNote", rc); el("div#rvList.rvlist", rc); el("span#rvCount", rc); el("span#rvFbText", rc);
   el("button#btnRuleAdd[data-act=rule-add]", rc); el("button#btnFbPick[data-act=fb-pick]", rc);
+  el("button#btnRulePick[data-act=rule-selmode]", rc); el("button#btnRuleAll[data-act=rule-all]", rc);
+  el("button#btnRuleDel[data-act=rule-del-sel]", rc); el("button#btnRuleCancel[data-act=rule-selmode]", rc);
   el("button.switch#swRules[data-rules-switch=1]", rc);
   el("button.switch#swFallback[data-fb-switch=1]", rc);
 
