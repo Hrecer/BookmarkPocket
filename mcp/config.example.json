@@ -1,5 +1,5 @@
 {
   "port": 19127,
   "token": "（留空则服务端首次启动自动生成 token 并写回 config.json；再把同一串填到扩展选项页）",
-  "allowedOrigins": ["chrome-extension://abcdefghijklmnopabcdefghijklmnop"]
+  "allowedOrigins": ["chrome-extension://<你的扩展 ID，扩展设置页可见；留空数组则不校验来源>"]
 }

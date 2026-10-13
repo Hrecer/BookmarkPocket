@@ -19,7 +19,10 @@ log("配置:", CONFIG_PATH, "（首次生成时会把 token 填到扩展选项�
 // 宿主没了就自己走：我们是宿主按 stdio 拉起的子进程，stdin 一旦结束（宿主退出、
 // 崩溃、不再说话），说明没人需要这个中枢了 —— 必须自己退出，绝不留成后台孤儿。
 // 不能指望"宿主会顺手杀掉子进程"，也不能指望管道断开那种连带反应。
-let byeDone = false;
+//
+// 但只在「宿主确实跟我们说过话」之后才认这一下：有的拉起方式根本没给 stdin 管道
+// （stdio: ignore / /dev/null），那种情况下 stdin 一上来就是结束，不能据此自杀。
+let byeDone = false, sawStdin = false;
 function bye(why) {
   if (byeDone) return;
   byeDone = true;
@@ -27,7 +30,8 @@ function bye(why) {
   try { hub.close(); } catch (e) { /* ignore */ }
   process.exit(0);
 }
-process.stdin.on("end", () => bye("宿主已关闭（stdin 结束）"));
+process.stdin.on("data", () => { sawStdin = true; });
+process.stdin.on("end", () => { if (sawStdin) bye("宿主已关闭（stdin 结束）"); });
 process.on("SIGINT", () => bye("收到 Ctrl+C"));
 process.on("SIGTERM", () => bye("收到终止信号"));
 

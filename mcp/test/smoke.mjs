@@ -155,9 +155,12 @@ const portOpen = (port) => new Promise((res) => {
 });
 let orphanUp = false;
 for (let i = 0; i < 25; i++) { if (await portOpen(ORPHAN_PORT)) { orphanUp = true; break; } await new Promise((r) => setTimeout(r, 200)); }
+// 先像真宿主那样握一次手：没握过手就不算"宿主说过话"，那种情况（宿主压根没给 stdin）不该自杀
+orphan.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "smoke-orphan", version: "1" } } }) + "\n");
+await new Promise((r) => setTimeout(r, 400));
 orphan.stdin.end();                          // 模拟宿主退出（stdin 断掉）
 await new Promise((r) => setTimeout(r, 1500));
-ok("宿主一没（stdin 结束）中枢自行退出，不留后台孤儿", orphanUp && orphanExit === 0, "up=" + orphanUp + " exit=" + orphanExit);
+ok("宿主一没（握手后 stdin 结束）中枢自行退出，不留后台孤儿", orphanUp && orphanExit === 0, "up=" + orphanUp + " exit=" + orphanExit);
 if (orphanExit === null) orphan.kill();
 
 console.log(`\n${pass}/${pass + fail} 通过`);

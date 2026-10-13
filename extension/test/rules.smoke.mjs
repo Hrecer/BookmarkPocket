@@ -95,9 +95,9 @@ const base = normalize({
 {
   ok("自上而下先命中先用", pickTarget(base, "https://www.example.com/class/1.html") === "收藏夹栏 > 示例分类 > 子目录");
   ok("后面的规则兜住同域其他页面", pickTarget(base, "https://www.example.com/author/1.html") === "收藏夹栏 > 示例分类");
-  ok("都没命中走兜底", pickTarget(base, "https://example.com/") === "收藏夹栏");
+  ok("都没命中走兜底", pickTarget(base, "https://example.org/") === "收藏夹栏");
   ok("总开关关掉：一律不动", pickTarget({ ...base, enabled: false }, "https://www.example.com/class/1.html") === null);
-  ok("兜底关掉且没命中：不动", pickTarget({ ...base, fallback: { enabled: false, path: "x" } }, "https://example.com/") === null);
+  ok("兜底关掉且没命中：不动", pickTarget({ ...base, fallback: { enabled: false, path: "x" } }, "https://example.org/") === null);
 }
 
 // 3. 脏数据归一

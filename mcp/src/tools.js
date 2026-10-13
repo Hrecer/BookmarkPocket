@@ -124,7 +124,7 @@ export const TOOLS = [
     name: "rules_set",
     description:
       "整份写入「收藏归位」规则。开启后，新收藏的书签（Ctrl+D / 点星星 / 拖拽）按规则自动归位；" +
-      "list 自上而下先命中先用，target 写文件夹路径（如 \"收藏夹栏 > 示例分类 > 子目录\"，不存在会自动建）",
+      "list 自上而下先命中先用，target 写文件夹路径（如 \"收藏夹栏 > 某分类 > 子目录\"，不存在会自动建）",
     op: "rules.set",
     shape: { config: rulesConfig },
   },

@@ -46,8 +46,8 @@ A rule is a match plus a target folder:
 
 | Match | Target |
 | --- | --- |
-| Domain `example.com` | `Bookmarks bar > 示例分类` |
-| URL contains `example.com/class` | `Bookmarks bar > 示例分类 > Mods` |
+| Domain `example.com` | `Bookmarks bar > Example` |
+| URL contains `example.com/docs` | `Bookmarks bar > Example > Docs` |
 
 Both the switch and the fallback can be turned off in **Settings**; the Rules tab picks target folders straight from your bookmark tree, and missing folders are created on demand.
 
@@ -68,7 +68,7 @@ Register the MCP server with your host:
 }
 ```
 
-The assistant gets 14 tools: read the tree, search, create, rename, move, bulk move, bulk create, delete, undo, check the connection, and read/write the routing rules.
+The assistant gets 15 tools: read the tree, search, create, rename, move, bulk move, bulk create, delete, undo, check the connection, and read/write/apply the routing rules.
 
 The local hub listens on `127.0.0.1` only, guarded by a token and an origin allowlist.
 

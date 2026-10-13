@@ -75,7 +75,7 @@ export function pickTarget(cfg, url, useFallback = true) {
   return useFallback && cfg.fallback.enabled ? cfg.fallback.path : null;
 }
 
-// 把 "收藏夹栏 > 示例分类 > 子目录" 解析成文件夹 id；缺哪一层就建哪一层。
+// 把 "收藏夹栏 > 某分类 > 子目录" 解析成文件夹 id；缺哪一层就建哪一层。
 // tree 是当前树快照；cache 记住本次操作里「父目录+标题 → id」的解析结果，
 // 这样同一批里新建的分支能被后续路径复用。createFolder 决定「怎么建」（走 execute 记账，或直连 bm）。
 async function resolvePathId(tree, path, cache, createFolder) {
