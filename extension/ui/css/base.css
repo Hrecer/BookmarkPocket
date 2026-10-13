@@ -6,7 +6,13 @@
 
 :root {
   color-scheme: light dark;
-  --font: system-ui, "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  /* 中文走 Noto Sans SC，不点名 "Microsoft YaHei UI"。
+     原因：雅黑 UI 变体在 13px 这种小字号下 hinting 很凶，笔画密的字（则 / 索）会被压扁，
+     同为 13px 的 Noto 和通用 sans-serif 回退都没有这个问题（100%/125% 缩放对比可复现）。
+     注意 Chromium 只认名单里第一个字体是否覆盖该字，所以中文字体必须排在最前，
+     放在 system-ui / Segoe UI 后面等于没写。不内嵌字体，只引用系统已装的。
+     依赖本机 Noto Sans SC；没有的机器会依次落到 Segoe UI / 微软雅黑 / 通用无衬线。 */
+  --font: "Noto Sans SC", "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
   --mono: "Cascadia Mono", Consolas, monospace;
 
   --app-bg: #efefef;
