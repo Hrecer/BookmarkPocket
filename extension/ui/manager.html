@@ -169,9 +169,8 @@
   <section class="rulesview" id="rulesview" hidden>
     <div class="card spanel">
       <div class="dlabel">收藏归位</div>
-      <div class="srow segs">
-        <button class="tbtn" data-rules-on="1" type="button">开启</button>
-        <button class="tbtn" data-rules-on="0" type="button">关闭</button>
+      <div class="srow">
+        <button class="switch" id="swRules" data-rules-switch="1" type="button" role="switch" aria-checked="true"></button>
         <span class="dim" id="rvNote"></span>
       </div>
       <p class="snote">开启后，新收藏的书签会按下面的规则自动归位（Ctrl+D、点星星、拖拽、别的扩展建的都算）。
@@ -187,11 +186,10 @@
     </div>
     <div class="card spanel">
       <div class="dlabel">兜底</div>
-      <div class="srow segs">
-        <button class="tbtn" data-fb-on="1" type="button">开启</button>
-        <button class="tbtn" data-fb-on="0" type="button">关闭</button>
-        <button id="btnFbPick" data-act="fb-pick" class="tbtn" type="button">改目标文件夹</button>
+      <div class="srow">
+        <button class="switch" id="swFallback" data-fb-switch="1" type="button" role="switch" aria-checked="true"></button>
         <span class="dim" id="rvFbText"></span>
+        <button id="btnFbPick" data-act="fb-pick" class="tbtn" type="button">改目标文件夹</button>
       </div>
       <p class="snote">没命中任何规则时，全部归到这里（默认收藏夹栏）。</p>
     </div>
@@ -206,20 +204,6 @@
         <button class="tbtn" data-theme-set="dark" type="button">深色</button>
       </div>
       <p class="snote">默认跟随系统的浅色 / 深色设置；也可以在这里固定成某一种。右上角图标是同一个开关。</p>
-    </div>
-    <div class="card spanel">
-      <div class="dlabel">收藏归位</div>
-      <div class="srow segs">
-        <button class="tbtn" data-rules-on="1" type="button">开启</button>
-        <button class="tbtn" data-rules-on="0" type="button">关闭</button>
-        <button id="btnRulesOpen" data-act="open-rules" class="tbtn" type="button">编辑规则</button>
-      </div>
-      <div class="srow segs">
-        <button class="tbtn" data-fb-on="1" type="button">兜底开启</button>
-        <button class="tbtn" data-fb-on="0" type="button">兜底关闭</button>
-        <span class="dim" id="setFbPath"></span>
-      </div>
-      <p class="snote">默认全开：新收藏的书签按「规则」页里的规则自动归位；没命中任何规则就归到兜底文件夹（默认收藏夹栏）。</p>
     </div>
     <div class="card spanel">
       <div class="dlabel">桥（连接 Agent 中枢）</div>

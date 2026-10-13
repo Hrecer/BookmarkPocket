@@ -22,12 +22,11 @@ export async function refreshRulesUI() {
 
 function render() {
   const cfg = R.cfg;
-  for (const b of document.querySelectorAll("[data-rules-on]")) b.classList.toggle("on", (b.dataset.rulesOn === "1") === cfg.enabled);
-  for (const b of document.querySelectorAll("[data-fb-on]")) b.classList.toggle("on", (b.dataset.fbOn === "1") === cfg.fallback.enabled);
+  setSwitch($("#swRules"), cfg.enabled);
+  setSwitch($("#swFallback"), cfg.fallback.enabled);
   $("#rvNote").textContent = cfg.enabled ? "已开启" : "已关闭";
   $("#rvCount").textContent = cfg.list.length ? `共 ${cfg.list.length} 条` : "";
   $("#rvFbText").textContent = "→ " + cfg.fallback.path;
-  $("#setFbPath").textContent = "→ " + cfg.fallback.path;
   $("#rvList").innerHTML = cfg.list.length
     ? cfg.list.map(rowHTML).join("")
     : '<p class="snote">还没有规则——所有新收藏都走下面的兜底。</p>';
@@ -44,6 +43,11 @@ function rowHTML(r, i, n) {
     <button class="tbtn rvmini" data-act="rule-edit" type="button">改</button>
     <button class="tbtn rvmini" data-act="rule-del" type="button">删</button>
   </div>`;
+}
+
+function setSwitch(el, on) {
+  el.classList.toggle("on", !!on);
+  el.setAttribute("aria-checked", on ? "true" : "false");
 }
 
 async function save(next) {
@@ -159,12 +163,12 @@ function onRuleFoot(what) {
 /* ---------- 接线 ---------- */
 
 function onClick(e) {
-  const el = e.target.closest("[data-act],[data-rules-on],[data-fb-on],[data-pick],[data-rule],[data-rule-type],[data-pick-id]");
+  const el = e.target.closest("[data-act],[data-rules-switch],[data-fb-switch],[data-pick],[data-rule],[data-rule-type],[data-pick-id]");
   if (!el) return;
   const d = el.dataset;
   if (d.act) return onAct(d.act, el);
-  if (d.rulesOn) return save({ ...R.cfg, enabled: d.rulesOn === "1" });
-  if (d.fbOn) return save({ ...R.cfg, fallback: { ...R.cfg.fallback, enabled: d.fbOn === "1" } });
+  if (d.rulesSwitch) return save({ ...R.cfg, enabled: !R.cfg.enabled });
+  if (d.fbSwitch) return save({ ...R.cfg, fallback: { ...R.cfg.fallback, enabled: !R.cfg.fallback.enabled } });
   if (d.pick) return onPick(d.pick);
   if (d.rule) return onRuleFoot(d.rule);
   if (d.ruleType) { R.draft.type = d.ruleType; syncType(); return; }

@@ -226,16 +226,12 @@ function el(sel, parent) {
   el("span#cfgStatus", c1);
   el("div[data-theme-set=auto]", c1); el("div[data-theme-set=light]", c1); el("div[data-theme-set=dark]", c1);
   el("span#cfgExtId", c1); el("span#cfgOrigin", c1);
-  el("span#setFbPath", c1); el("button#btnRulesOpen[data-act=open-rules]", c1);
-  el("button.tbtn[data-rules-on=1]", c1); el("button.tbtn[data-rules-on=0]", c1);
-  el("button.tbtn[data-fb-on=1]", c1); el("button.tbtn[data-fb-on=0]", c1);
-
   const rv = el("section#rulesview.rulesview"); rv.hidden = true;
   const rc = el("div.card.spanel", rv);
   el("span#rvNote", rc); el("div#rvList.rvlist", rc); el("span#rvCount", rc); el("span#rvFbText", rc);
   el("button#btnRuleAdd[data-act=rule-add]", rc); el("button#btnFbPick[data-act=fb-pick]", rc);
-  el("button.tbtn[data-rules-on=1]", rc); el("button.tbtn[data-rules-on=0]", rc);
-  el("button.tbtn[data-fb-on=1]", rc); el("button.tbtn[data-fb-on=0]", rc);
+  el("button.switch#swRules[data-rules-switch=1]", rc);
+  el("button.switch#swFallback[data-fb-switch=1]", rc);
 
   const pk = el("div#pickOverlay.overlay"); pk.hidden = true;
   el("span#pickTitle", pk); el("div#pickList", pk); el("span#pickPath", pk);

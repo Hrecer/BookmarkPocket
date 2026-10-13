@@ -30,10 +30,26 @@
   padding: 4px 12px 10px;
 }
 .rulesview[hidden] { display: none; }
+/* 开关：轨道 + 圆钮。比「开启 / 关闭」两个按钮那种分段写法更像正经开关。 */
+.switch {
+  position: relative; flex: none; width: 46px; height: 26px; padding: 0;
+  border: 0; border-radius: 999px; background: var(--tint-strong);
+  cursor: pointer; transition: background-color .16s ease;
+}
+.switch::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+  border-radius: 50%; background: var(--fg-faint);
+  transition: transform .16s ease, background-color .16s ease;
+}
+.switch:hover { filter: brightness(1.12); }
+.switch:active { filter: brightness(.94); }
+.switch.on { background: var(--primary-fill); }
+.switch.on::after { transform: translateX(20px); background: var(--on-primary); }
+
 .rvlist { display: flex; flex-direction: column; gap: 6px; }
 .rvrow {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px; border-radius: 14px; background: var(--tint);
+  min-height: 44px; padding: 6px 12px; border-radius: 18px; background: var(--tint);
 }
 .rvrow.off { opacity: .5; }
 .rvbtn {
@@ -49,7 +65,10 @@
 .rvmatch b { color: var(--fg); font-weight: 600; }
 .rvarrow { color: var(--fg-faint); flex: none; }
 .rvtarget { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rvmini { padding: 4px 10px; font-size: 12px; }
+/* 规则页的按钮一律给底色：光秃秃的文字式按钮在这页看着不像按钮 */
+.rulesview .tbtn { background: var(--tonal); }
+.rulesview .tbtn:hover:not(:disabled) { background: var(--tonal-strong); }
+.rvmini { min-height: 30px; padding: 5px 12px; font-size: 12px; }
 .picklist {
   max-height: 46vh; overflow: auto; margin-top: 12px;
   border: 1px solid var(--line); border-radius: 14px; padding: 6px;

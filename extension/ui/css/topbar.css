@@ -104,7 +104,8 @@
   transition: background-color .12s, color .12s, filter .12s;
 }
 .tbtn svg { width: 16px; height: 16px; flex: none; }
-.tbtn:hover:not(:disabled) { background: var(--surface); box-shadow: var(--shadow); }
+/* 悬停只换底色，不加投影：底色在浅/深色下都够清晰，投影在深色底上会糊成一圈脏边 */
+.tbtn:hover:not(:disabled) { background: var(--tonal); }
 .tbtn:active:not(:disabled) { background: var(--tint-strong); box-shadow: none; }
 .tbtn:disabled { opacity: .38; cursor: default; }
 .tbtn.primary {
