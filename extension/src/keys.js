@@ -17,4 +17,5 @@ export const K = {
   oplog: PREFIX + "oplog.v1",
   theme: PREFIX + "theme",
   view: PREFIX + "view",   // 浏览页布局：list / card（localStorage，仅记住上次选择）
+  rules: PREFIX + "rules.v1",   // 收藏归位规则：总开关 + 兜底 + 规则表
 };

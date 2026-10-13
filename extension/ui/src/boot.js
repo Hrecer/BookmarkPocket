@@ -19,6 +19,7 @@ import { applySearchWindow, locateRow, moveNavInd, openSearchNode, renderSearch,
 import { blankMenuItems, cancelCut, cleanupDrag, ctxEl, doCopy, doCut, dragState, executeTransfer, hideCtxMenu, openMenuForSelection, pasteInto, resolveDropTarget, setDropHighlight, showCtxMenu, showTransferMenu } from "./transfer.js";
 import { copyPath, ensureListVisible, ensureTreeVisible, expandToCurrent, initSplitter } from "./shortcuts.js";
 import { applyTheme, cycleTheme, pollBridge, readThemeMode, refreshCfgStatus } from "./shell.js";
+import { wireRulesView } from "./rulesview.js";
 
 // 单帧位移超过约一屏 → 判为「超大幅滚动」：这期间先不加载 favicon（图片解码是最大头），
 // 停稳 140ms 后再整窗重绘一次补上。100K 量级下，这是拖动滚动条时不掉帧的关键。
@@ -344,6 +345,8 @@ export function wire() {
   });
 
   $("#btnTheme").addEventListener("click", cycleTheme);
+
+  wireRulesView();
 
   // 卡片模式：容器级事件委托 + 两组「列表 / 卡片」切换（浏览页与搜索页各自独立）
   wireCardGrid();

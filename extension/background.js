@@ -2,12 +2,15 @@
 
 import { execute, defineOps, invalidateTree } from "./src/ops.js";
 import * as bridge from "./src/bridge.js";
+import * as rules from "./src/rules.js";
 import { K } from "./src/keys.js";
 
 defineOps({
   "sys.bridge.status": { fn: async () => bridge.getState() },
   "sys.bridge.reconnect": { fn: async () => { await bridge.reconnect(); return bridge.getState(); } },
   "sys.bridge.pair": { fn: async () => bridge.pair() },
+  "rules.get": { fn: async () => rules.read() },
+  "rules.set": { fn: async ({ config } = {}) => rules.write(config) },
 });
 
 function boot() {
@@ -43,7 +46,11 @@ function onBmEvent(name, args) {
   chrome.runtime.sendMessage({ channel: "bkm", event: name, args }).catch(() => {});
 }
 
-chrome.bookmarks.onCreated.addListener((id, node) => onBmEvent("onCreated", { id, node }));
+chrome.bookmarks.onCreated.addListener((id, node) => {
+  onBmEvent("onCreated", { id, node });
+  // 收藏归位：弹窗里显示的文件夹改不了（那是宿主界面），但书签一落地就能按规则搬正。
+  rules.autoRoute(id, node).catch(() => {});
+});
 chrome.bookmarks.onRemoved.addListener((id, info) => onBmEvent("onRemoved", { id, info }));
 chrome.bookmarks.onChanged.addListener((id, info) => onBmEvent("onChanged", { id, info }));
 chrome.bookmarks.onMoved.addListener((id, info) => onBmEvent("onMoved", { id, info }));

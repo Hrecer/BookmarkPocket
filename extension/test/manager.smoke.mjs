@@ -167,6 +167,7 @@ function el(sel, parent) {
   el("span.nav-ind", nav);
   el("button.navitem[data-view=browse].active", nav);
   el("button.navitem[data-view=search]", nav);
+  el("button.navitem[data-view=rules]", nav);
   el("button.navitem[data-view=settings]", nav);
 
   el("div.navrow");
@@ -225,6 +226,22 @@ function el(sel, parent) {
   el("span#cfgStatus", c1);
   el("div[data-theme-set=auto]", c1); el("div[data-theme-set=light]", c1); el("div[data-theme-set=dark]", c1);
   el("span#cfgExtId", c1); el("span#cfgOrigin", c1);
+  el("span#setFbPath", c1); el("button#btnRulesOpen[data-act=open-rules]", c1);
+  el("button.tbtn[data-rules-on=1]", c1); el("button.tbtn[data-rules-on=0]", c1);
+  el("button.tbtn[data-fb-on=1]", c1); el("button.tbtn[data-fb-on=0]", c1);
+
+  const rv = el("section#rulesview.rulesview"); rv.hidden = true;
+  const rc = el("div.card.spanel", rv);
+  el("span#rvNote", rc); el("div#rvList.rvlist", rc); el("span#rvCount", rc); el("span#rvFbText", rc);
+  el("button#btnRuleAdd[data-act=rule-add]", rc); el("button#btnFbPick[data-act=fb-pick]", rc);
+  el("button.tbtn[data-rules-on=1]", rc); el("button.tbtn[data-rules-on=0]", rc);
+  el("button.tbtn[data-fb-on=1]", rc); el("button.tbtn[data-fb-on=0]", rc);
+
+  const pk = el("div#pickOverlay.overlay"); pk.hidden = true;
+  el("span#pickTitle", pk); el("div#pickList", pk); el("span#pickPath", pk);
+
+  const ro = el("div#ruleOverlay.overlay"); ro.hidden = true;
+  el("span#ruleHead", ro); el("input#ruleValue", ro); el("input#ruleTarget", ro); el("span#ruleHint", ro);
 
   el("div#confirmOverlay", document.body).hidden = true;
   el("div#cfTitle"); el("div#cfMsg"); el("button#cfOk"); el("button#cfCancel");
@@ -275,6 +292,8 @@ const chrome = {
         case "bookmark.remove": return { ok: true, data: { removed: (A.ids || []).length } };
         case "bookmark.move": return { ok: true, data: { moved: (A.ids || []).length } };
         case "bookmark.undo_last": return { ok: true, data: { undone: "bookmark.create" } };
+        case "rules.get": return { ok: true, data: { enabled: true, fallback: { enabled: true, path: "收藏夹栏" }, list: [] } };
+        case "rules.set": return { ok: true, data: Object.assign({ enabled: true, fallback: { enabled: true, path: "收藏夹栏" }, list: [] }, A.config) };
         default: return { ok: true, data: {} };
       }
     },

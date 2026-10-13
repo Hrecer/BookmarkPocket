@@ -30,6 +30,8 @@ export const searchViewEl = $("#searchview");
 
 export const settingsViewEl = $("#settingsview");
 
+export const rulesViewEl = $("#rulesview");
+
 export const navrow = $(".navrow"), actionrow = $(".actionrow"), panesEl = $("#panes");
 
 export const T_ROW_H = 30;

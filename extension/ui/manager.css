@@ -258,31 +258,37 @@ body {
 .tree::-webkit-scrollbar,
 .list::-webkit-scrollbar,
 .details::-webkit-scrollbar,
-.settingsview::-webkit-scrollbar { width: 16px; height: 16px; }
+.settingsview::-webkit-scrollbar,
+.rulesview::-webkit-scrollbar { width: 16px; height: 16px; }
 .tree::-webkit-scrollbar-track,
 .list::-webkit-scrollbar-track,
 .details::-webkit-scrollbar-track,
-.settingsview::-webkit-scrollbar-track { background: transparent; }
+.settingsview::-webkit-scrollbar-track,
+.rulesview::-webkit-scrollbar-track { background: transparent; }
 .tree::-webkit-scrollbar-corner,
 .list::-webkit-scrollbar-corner,
 .details::-webkit-scrollbar-corner,
-.settingsview::-webkit-scrollbar-corner { background: transparent; }
+.settingsview::-webkit-scrollbar-corner,
+.rulesview::-webkit-scrollbar-corner { background: transparent; }
 .tree::-webkit-scrollbar-thumb,
 .list::-webkit-scrollbar-thumb,
 .details::-webkit-scrollbar-thumb,
-.settingsview::-webkit-scrollbar-thumb {
+.settingsview::-webkit-scrollbar-thumb,
+.rulesview::-webkit-scrollbar-thumb {
   background: var(--sb); border: 4px solid transparent; background-clip: padding-box; border-radius: 999px;
 }
 .tree::-webkit-scrollbar-thumb:hover,
 .list::-webkit-scrollbar-thumb:hover,
 .details::-webkit-scrollbar-thumb:hover,
-.settingsview::-webkit-scrollbar-thumb:hover {
+.settingsview::-webkit-scrollbar-thumb:hover,
+.rulesview::-webkit-scrollbar-thumb:hover {
   background-color: var(--sb-strong); border-width: 3px; background-clip: padding-box;
 }
 .tree::-webkit-scrollbar-thumb:active,
 .list::-webkit-scrollbar-thumb:active,
 .details::-webkit-scrollbar-thumb:active,
-.settingsview::-webkit-scrollbar-thumb:active {
+.settingsview::-webkit-scrollbar-thumb:active,
+.rulesview::-webkit-scrollbar-thumb:active {
   background-color: var(--sb-strong); border-width: 2px; background-clip: padding-box;
 }
 #tspacer { width: 1px; }
@@ -598,6 +604,47 @@ body.dragging * { cursor: grabbing !important; }
 .segs .tbtn.on { background: var(--accent-container); font-weight: 600; box-shadow: none; }
 .segs .tbtn.on:hover:not(:disabled) { background: var(--accent-container-strong); }
 .snote { font-size: 12px; color: var(--fg-faint); margin-top: 8px; }
+
+/* ---------- 规则页 ---------- */
+.rulesview {
+  flex: 1; min-height: 0; overflow: auto;
+  overflow-anchor: none;
+  width: 100%; max-width: 720px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 4px 12px 10px;
+}
+.rulesview[hidden] { display: none; }
+.rvlist { display: flex; flex-direction: column; gap: 6px; }
+.rvrow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 14px; background: var(--tint);
+}
+.rvrow.off { opacity: .5; }
+.rvbtn {
+  width: 24px; height: 24px; flex: none; border: 0; border-radius: 8px;
+  background: transparent; color: var(--fg-dim); cursor: pointer; font-size: 13px;
+}
+.rvbtn:hover:not(:disabled) { background: var(--tint-strong); color: var(--fg); }
+.rvbtn:disabled { opacity: .3; cursor: default; }
+.rvmatch {
+  flex: none; max-width: 46%; font-size: 13px; color: var(--fg-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rvmatch b { color: var(--fg); font-weight: 600; }
+.rvarrow { color: var(--fg-faint); flex: none; }
+.rvtarget { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rvmini { padding: 4px 10px; font-size: 12px; }
+.picklist {
+  max-height: 46vh; overflow: auto; margin-top: 12px;
+  border: 1px solid var(--line); border-radius: 14px; padding: 6px;
+}
+.pickrow {
+  padding: 7px 10px; border-radius: 9px; font-size: 13px; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pickrow:hover { background: var(--tint); }
+.pickrow.on { background: var(--accent-container); font-weight: 600; }
+
 .fade { transition: opacity .16s ease; }
 .fade.hide { opacity: 0; }
 

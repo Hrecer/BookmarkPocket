@@ -61,7 +61,8 @@ await new Promise((res) => ext.once("message", res)); // welcome
 
 const tools = await client.listTools();
 const names = tools.tools.map((t) => t.name);
-ok("tools/list 返回 12 个工具", names.length === 12, names.join(", "));
+ok("tools/list 返回 14 个工具", names.length === 14, names.join(", "));
+ok("包含规则工具 rules_get / rules_set", names.includes("rules_get") && names.includes("rules_set"));
 ok("包含 bookmark_remove / bookmark_undo_last", names.includes("bookmark_remove") && names.includes("bookmark_undo_last"));
 ok("包含批量工具 bookmark_move_many / bookmark_create_many",
    names.includes("bookmark_move_many") && names.includes("bookmark_create_many"));
@@ -80,6 +81,10 @@ ok("参数透传到扩展", t2.echo && t2.echo.op === "bookmark.search" && t2.ec
 
 const r3 = await client.callTool({ name: "bookmarks_tree", arguments: {} });
 ok("树数据回传", r3.content[0].text.includes("收藏夹栏"));
+
+const r3b = await client.callTool({ name: "rules_set", arguments: { config: { enabled: true, list: [] } } });
+const t3b = JSON.parse(r3b.content[0].text);
+ok("rules_set 参数透传到扩展", t3b.echo && t3b.echo.op === "rules.set" && t3b.echo.args.config.enabled === true);
 
 ext.close();
 await new Promise((r) => setTimeout(r, 300));

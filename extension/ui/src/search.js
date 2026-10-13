@@ -5,7 +5,7 @@ import { setStatus, toast } from "./chan.js";
 import { askDeleteFromPane } from "./crud.js";
 import { flattenAll } from "./data.js";
 import { esc } from "./details.js";
-import { $, L_ROW_H, actionrow, busyEl, fmt, navrow, panesEl, qEl, qListEl, qemptyEl, qrowsEl, qspacerEl, searchViewEl, settingsViewEl } from "./dom.js";
+import { $, L_ROW_H, actionrow, busyEl, fmt, navrow, panesEl, qEl, qListEl, qemptyEl, qrowsEl, qspacerEl, rulesViewEl, searchViewEl, settingsViewEl } from "./dom.js";
 import { openEditorFor } from "./edit.js";
 import { cutClass, renderList, setRowIcon, syncSelection } from "./list.js";
 import { goTo, refresh, scrollIdIntoView, updateStatusCounts } from "./nav.js";
@@ -26,8 +26,9 @@ export function switchView(mode) {
   document.querySelectorAll(".navitem").forEach((b) => b.classList.toggle("active", b.dataset.view === mode));
   moveNavInd();
   const browse = [navrow, actionrow, panesEl];
-  const show = mode === "browse" ? browse : mode === "search" ? [searchViewEl] : [settingsViewEl];
-  for (const el of [...browse, searchViewEl, settingsViewEl]) el.hidden = !show.includes(el);
+  const panels = [...browse, searchViewEl, rulesViewEl, settingsViewEl];
+  const show = { browse, search: [searchViewEl], rules: [rulesViewEl], settings: [settingsViewEl] }[mode] || browse;
+  for (const el of panels) el.hidden = !show.includes(el);
   // 切换淡入（只动透明度，不做位移）
   for (const el of show) {
     el.classList.add("hide");

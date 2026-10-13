@@ -14,8 +14,18 @@ const st = () => globalThis.chrome.storage.local;
 
 export function invalidateTree() { treeCache = null; }
 
+// 扩展自己写入期间置位。rules.autoRoute 靠它区分「我们建的」与「用户收藏的」——
+// 否则自动归位会把自己刚建好的条目再搬一次。execute 是唯一的写入入口，所以这里置位就够。
+let internal = 0;
+
+export function isInternalWrite() { return internal > 0; }
+
 export function execute(op, args = {}) {
-  const p = tail.then(() => dispatch(String(op || ""), args || {}));
+  const p = tail.then(async () => {
+    internal++;
+    try { return await dispatch(String(op || ""), args || {}); }
+    finally { internal--; }
+  });
   tail = p.then(() => {}, () => {});
   return p;
 }
