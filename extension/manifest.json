@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "BookmarkPocket",
   "version": "0.1.0",
-  "description": "书签管理器（人机共用同一条操作管线）+ Agent 控制通道",
+  "description": "浏览器书签管理器：整理、搜索、批量移动书签，也能交给 AI 助手代劳",
   "permissions": ["bookmarks", "alarms", "storage", "favicon"],
   "host_permissions": ["http://127.0.0.1/*"],
   "background": { "service_worker": "background.js", "type": "module" },
