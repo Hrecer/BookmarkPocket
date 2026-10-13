@@ -4,6 +4,7 @@
 // 这样模块之间即使互相 import（如 tree ↔ nav）也不会碰到求值顺序问题。
 
 import { S, expanded, nodeById } from "./state.js";
+import { K } from "../../src/keys.js";
 import { $, actionrow, busyEl, listEl, navrow, panesEl, qEl, qListEl, searchViewEl, settingsViewEl, treeEl } from "./dom.js";
 import { op, setStatus, toast } from "./chan.js";
 import { onScrollFrame } from "./virtual.js";
