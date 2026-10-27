@@ -363,12 +363,46 @@ if (M) {
   M.toggleExpand("1");
   flushRaf();
   const n1 = treeEls().length;
-  ok(n1 > n0, "展开书签栏后节点变多（" + n0 + " → " + n1 + "）");
+  ok(n1 > n0, "展开书签栏后文件夹变多（" + n0 + " → " + n1 + "）");
   M.toggleExpand("1");
   flushRaf();
   ok(treeEls().length === n0, "再点一次收回去（" + treeEls().length + "）");
   M.toggleExpand("1");
   flushRaf();
+
+  console.log("\n— 左栏：只显示文件夹 / 当前位置高亮 —");
+  {
+    const rows = M.buildTreeRows();
+    ok(rows[0].isRoot && rows[0].node.id === "0", "左栏首行是虚拟根「全部书签」");
+    ok(rows.every((r) => !r.node.url), "左栏只显示文件夹（链接不入树）");
+    const cur = treeEls().find((e) => e._classes.has("current"));
+    ok(cur && cur._.name.textContent === "全部书签", "在根目录：「全部书签」行恒为当前位置高亮");
+    await M.navigate("1");
+    flushRaf();
+    const cur2 = treeEls().find((e) => e._classes.has("current"));
+    ok(cur2 && cur2._.name.textContent === "书签栏", "进入文件夹后高亮转移到当前文件夹");
+    ok(!treeEls().some((e) => e._classes.has("sel")), "左栏不投影主栏选中集合（高亮只代表位置）");
+    M.selectOne("11", null);   // 主栏选中一条链接
+    flushRaf();
+    ok(!treeEls().some((e) => e._classes.has("sel")), "主栏选中链接不会点亮左栏（位置 ≠ 选中）");
+    M.clearSel();
+    flushRaf();
+  }
+
+  console.log("\n— 退出文件夹：选中来源 —");
+  {
+    await M.navigate("10");
+    M.clearSel();
+    await M.navigate("1", { selectExitedChild: true });
+    flushRaf();
+    const sel = rowEls().filter((r) => r._classes.has("sel"));
+    ok(sel.length === 1 && sel[0]._.nm.textContent === "技术", "退出子目录后父目录里选中刚退出的文件夹");
+    await M.navigate("10");
+    M.clearSel();
+    await M.navigate("1");   // 普通跳转（树行点击路径）不是「退出」，不改选中
+    flushRaf();
+    ok(rowEls().filter((r) => r._classes.has("sel")).length === 0, "普通跳转不额外选中来源文件夹");
+  }
 
   console.log("\n— 选择 / 详情栏 —");
   M.selectOne("1", 0);
@@ -391,6 +425,8 @@ if (M) {
   flushRaf();
   await new Promise((r) => setTimeout(r, 30));
   flushRaf();
+  ok(rowEls().some((r) => r._classes.has("sel") && r._.nm.textContent === "技术"),
+    "返回上级：父目录里选中刚退出的文件夹「技术」");
 
   console.log("\n— 新建 / 删除 / 撤销 —");
   calls.length = 0;

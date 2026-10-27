@@ -1,6 +1,6 @@
 // 主列表渲染与选择（由 ui/manager.js 拆分而来）
 
-import { S, lPool, qPool, recLinks, tPool } from "./state.js";
+import { S, lPool, qPool, recLinks, clearRenamePair, RENAME_PAIR_MIN_MS, RENAME_PAIR_WINDOW_MS } from "./state.js";
 import { favUrl, fmtDate, folderRows } from "./data.js";
 import { openNode, renderDetails } from "./details.js";
 import { $, ICON, L_ROW_H, emptyEl, emptydescEl, emptytitleEl, fmt, listEl, panesEl, rowsEl, searchViewEl, spacerEl } from "./dom.js";
@@ -25,11 +25,13 @@ export function makeListRow() {
     if (r) startDragCandidate(e, r.node);
   });
   el.addEventListener("dblclick", () => {
+    clearRenamePair();   // 双击打开是另一种手势，不得留下「下一击进改名」的待命
     if (S.suppressClick) { S.suppressClick = false; return; }
     const r = S.viewRows[Number(el.dataset.idx)];
     if (r) openNode(r.node);
   });
   el.addEventListener("contextmenu", (e) => {
+    clearRenamePair();   // 右键是另一种手势，不能夹在「两击对」之间
     if (S.rightDragJustEnded) { S.rightDragJustEnded = false; e.preventDefault(); return; }
     const r = S.viewRows[Number(el.dataset.idx)];
     if (!r) return;
@@ -137,13 +139,10 @@ export function applyAllWindows() {
 export function cutClass(id) { return S.clip && S.clip.mode === "cut" && S.clip.ids.includes(id) ? " cut" : ""; }
 
 export function syncSelection() {
-  // 更新三侧可视行 + 详情栏 + 状态栏胶囊
+  // 更新主栏 / 搜索结果可视行 + 详情栏 + 状态栏胶囊。
+  // 左栏不参与：树行高亮 = 当前所在目录（由 tree.js 按树版本重绘），与选中集合无关。
   for (const el of lPool) {
     const r = S.viewRows[Number(el.dataset.idx)];
-    if (r) el.classList.toggle("sel", S.sel.has(r.node.id));
-  }
-  for (const el of tPool) {
-    const r = S.treeView[Number(el.dataset.idx)];
     if (r) el.classList.toggle("sel", S.sel.has(r.node.id));
   }
   for (const el of qPool) {
@@ -178,25 +177,31 @@ export function clearSel() {
 }
 
 export function onRowClick(e, el) {
-  if (S.suppressClick) { S.suppressClick = false; return; }
+  if (S.suppressClick) { S.suppressClick = false; clearRenamePair(); return; }
   S.lastPane = "list";
   const idx = Number(el.dataset.idx);
   const r = S.viewRows[idx];
-  if (!r) return;
+  if (!r) { clearRenamePair(); return; }
   const id = r.node.id;
   if (e.ctrlKey || e.metaKey) {
+    clearRenamePair();
     if (S.sel.has(id)) S.sel.delete(id); else S.sel.add(id);
     S.anchor = idx;
   } else if (e.shiftKey && S.anchor != null && S.viewRows[S.anchor]) {
+    clearRenamePair();
     const [a, b] = [S.anchor, idx].sort((x, y) => x - y);
     for (let i = a; i <= b; i++) S.sel.add(S.viewRows[i].node.id);
   } else {
-    // 单击未选中=单选；单击已选中唯一项：慢速第二击=行内改名，快速双击交给 dblclick 打开
+    // 单击永不改名：第一击只「待命」，只有构成「两击对」的第二击才进入行内改名。
+    // 一对必须由连续两次无修饰键的普通单击构成（同一行）：
+    // 双击的第二击（e.detail ≥ 2）、Ctrl/Shift/Alt 点选、拖拽、右键、打开详情/编辑器、导航等都会作废上一击。
+    const plain = !e.altKey && e.button === 0 && e.detail <= 1;
     const wasSole = S.sel.size === 1 && S.sel.has(id);
     const now = Date.now();
-    const slowSecond = wasSole && S.lastClick.id === id && now - S.lastClick.t > 500;
-    S.lastClick = { id, t: now };
-    if (slowSecond) { startRenameList(idx); return; }
+    const gap = now - S.renamePair.t;
+    const pair = plain && S.renamePair.id === id && gap >= RENAME_PAIR_MIN_MS && gap <= RENAME_PAIR_WINDOW_MS;
+    if (plain) S.renamePair = { id, t: now }; else clearRenamePair();
+    if (pair && wasSole && !S.editingId) { clearRenamePair(); startRenameList(idx); return; }
     if (!wasSole) { S.sel = new Set([id]); S.anchor = idx; }
   }
   syncSelection();

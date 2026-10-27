@@ -1,6 +1,6 @@
 // 搜索页（由 ui/manager.js 拆分而来）
 
-import { S, nodeById, parentOf, qPool } from "./state.js";
+import { S, nodeById, parentOf, qPool, clearRenamePair } from "./state.js";
 import { setStatus, toast } from "./chan.js";
 import { askDeleteFromPane } from "./crud.js";
 import { flattenAll } from "./data.js";
@@ -17,6 +17,7 @@ import { syncCardMode, moveViewInd } from "./card-ops.js";
 
 export function switchView(mode) {
   if (S.viewMode === mode) { if (mode === "search") qEl.focus(); return; }
+  clearRenamePair();   // 切视图是另一种手势
   S.viewMode = mode;
   // 切视图一律清空选中：浏览与搜索的行集互不相同，把上一个视图的选中带过去会出现
   // 「列表空着、详情栏却挂着一个可删除的项」这种危险状态 —— 进了文件夹再切到搜索页，

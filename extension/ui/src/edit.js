@@ -1,6 +1,6 @@
 // 行内改名与新建（由 ui/manager.js 拆分而来）
 
-import { S, lPool, nodeById, tPool } from "./state.js";
+import { S, lPool, nodeById, tPool, clearRenamePair } from "./state.js";
 import { op, setStatus, toast } from "./chan.js";
 import { $ } from "./dom.js";
 import { syncSelection } from "./list.js";
@@ -31,6 +31,7 @@ export function startRenameSelected() {
 }
 
 export function startRenameIn(nameEl, node) {
+  clearRenamePair();   // F2 / 右键菜单 / 新建后改名都算插入动作，不得留下「下一击进改名」的待命
   if (S.editingId) return;
   if (!nameEl) { toast("请先选中列表里可见的项目"); return; }
   S.editingId = node.id;
@@ -94,6 +95,7 @@ export async function newFolder() {
 export let editorParent = null;
 
 export function openEditor() {
+  clearRenamePair();   // 打开编辑器是另一种手势，作废改名两击对
   if (S.currentFolderId === "0") { toast("「全部书签」是虚拟根，不能新建——请先进入一个文件夹", { error: true }); return; }
   S.editorMode = "new";
   S.editorTarget = null;
@@ -106,6 +108,7 @@ export function openEditor() {
 }
 
 export function openEditorFor(n) {
+  clearRenamePair();   // 打开编辑器是另一种手势，作废改名两击对
   if (!n || !n.url) return;
   S.editorMode = "edit";
   S.editorTarget = n;

@@ -1,6 +1,6 @@
 // 导航与刷新（由 ui/manager.js 拆分而来）
 
-import { S, expanded, nodeById, parentOf } from "./state.js";
+import { S, expanded, nodeById, parentOf, clearRenamePair } from "./state.js";
 import { op, setStatus, toast } from "./chan.js";
 import { childrenOf, indexTree, pathOf } from "./data.js";
 import { esc } from "./details.js";
@@ -14,8 +14,8 @@ export async function goTo(id, opts = {}) {
 }
 
 // 从 descendantId 往上找，返回「它落在 ancestorId 名下时」那一层的直接子节点 id。
-// 用于「从子文件夹回到祖先目录」时把刚出来的那个子文件夹选中（像资源管理器）。
-// 不是祖先关系（平级跳转）则返回 null。
+// 只服务「退出文件夹」语义（返回上级 / 后退 / 点面包屑祖先段）：父目录里选中刚退出的子文件夹。
+// 平级跳转 / 进入子目录都返回 null。
 function childOnPath(ancestorId, descendantId) {
   let cur = descendantId;
   while (cur && cur !== ancestorId) {
@@ -32,7 +32,11 @@ function expandTo(id) {
   while (parentOf.has(cur) && parentOf.get(cur) !== "0") { expanded.add(cur); cur = parentOf.get(cur); }
 }
 
-export async function navigate(id, { push = true } = {}) {
+// selectExitedChild = 「退出文件夹」收尾：导航落地后把刚退出的那一层子文件夹写进选中集合。
+// 唯一判据是导航前后的目录关系，不读当前选中集合——在子目录里点空白清过选中、或选中过链接，
+// 退出后来源都不会丢。树行点击 / 跳转定位 / 前进都不传（那是"跳转"，不是"退出"）。
+export async function navigate(id, { push = true, selectExitedChild = false } = {}) {
+  clearRenamePair();   // 导航是另一种手势：返回后的第一击只能重新待命
   if (id !== S.currentFolderId) {
     const prev = S.currentFolderId;
     if (push) { S.backStack.push(prev); S.fwdStack.length = 0; }
@@ -40,8 +44,7 @@ export async function navigate(id, { push = true } = {}) {
     // 换了文件夹就不保留选中：否则「刚进入的那个文件夹」会一直挂在选中集里，
     // 之后按 Delete 或点详情栏的删除按钮，删掉的就是整个文件夹（连同里面的书签）。
     S.sel.clear(); S.anchor = null;
-    // 但「从子目录回到祖先目录」要例外交待：把刚出来的那个子文件夹选中，跟资源管理器一致。
-    const cameFrom = prev ? childOnPath(id, prev) : null;
+    const cameFrom = selectExitedChild && prev ? childOnPath(id, prev) : null;
     if (cameFrom) S.sel = new Set([cameFrom]);
     // 滚动位置也按目录归零：否则在子文件夹里滚到底，回到父文件夹还停在底部。
     listEl.scrollTop = 0;
@@ -63,7 +66,7 @@ export async function navigate(id, { push = true } = {}) {
 export async function back() {
   if (!S.backStack.length) return;
   S.fwdStack.push(S.currentFolderId);
-  await navigate(S.backStack.pop(), { push: false });
+  await navigate(S.backStack.pop(), { push: false, selectExitedChild: true });
 }
 
 export async function forward() {
@@ -74,7 +77,7 @@ export async function forward() {
 
 export function up() {
   if (S.currentFolderId === "0") return;
-  goTo(parentOf.get(S.currentFolderId) || "0");
+  goTo(parentOf.get(S.currentFolderId) || "0", { selectExitedChild: true });
 }
 
 export function renderCrumbs() {
@@ -92,7 +95,7 @@ export function renderCrumbs() {
   });
   crumbsEl.innerHTML = html;
   crumbsEl.querySelectorAll(".crumb").forEach((b) => {
-    b.addEventListener("click", () => goTo(b.dataset.id));
+    b.addEventListener("click", () => goTo(b.dataset.id, { selectExitedChild: true }));
   });
 }
 
@@ -110,6 +113,7 @@ export function updateStatusCounts() {
 }
 
 export async function refresh({ busy = true, entering = false, fresh = false, counts = false } = {}) {
+  clearRenamePair();   // 刷新会重建行，作废旧的两击对
   if (busy) busyEl.hidden = false;
   try {
     const { tree } = await op("bookmark.tree", { fresh });

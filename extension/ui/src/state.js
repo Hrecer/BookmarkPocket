@@ -11,6 +11,19 @@ export const tPool = [], lPool = [], qPool = [];
 // 卡片模式的行池：每个池元素是一「逻辑行」（内含若干张卡片）。浏览页与搜索页各一套。
 export const cPool = [], qcPool = [];
 
+// 改名两击对的间隔下限（毫秒）：第二击必须距第一击至少这么久才算「刻意的两击」，
+// 选中后顺手再点一下（看详情等）绝不误触改名。
+export const RENAME_PAIR_MIN_MS = 800;
+// 改名两击对的间隔上限（毫秒）：第一击待命后超过它再点 = 不构成对（需重新起一对），
+// 避免「选中很久之后再点一下」直接进改名。
+export const RENAME_PAIR_WINDOW_MS = 5000;
+
+// 作废改名两击对：双击的第二击、拖拽、右键菜单、打开详情/编辑器、导航与刷新等
+// 任何其它手势都会调用它，保证下一击只能重新「待命」。
+export function clearRenamePair() {
+  S.renamePair = { id: null, t: 0 };
+}
+
 export const S = {
   treeRoots: [],
   rootNode: null,
@@ -26,7 +39,9 @@ export const S = {
   viewMode: "browse",
   viewRows: [],
   qRows: [],
-  lastClick: { id: null, t: 0 },
+  // 就地改名的「两击对」：单击永不改名（第一击只待命），第二击才可能改名。
+  // 一对必须由连续两次无修饰键的普通单击构成，且同一行、间隔 ∈ [RENAME_PAIR_MIN_MS, RENAME_PAIR_WINDOW_MS]。
+  renamePair: { id: null, t: 0 },
   qanchor: null,
   qActive: { title: true, url: true, path: true },
   qLast: "",

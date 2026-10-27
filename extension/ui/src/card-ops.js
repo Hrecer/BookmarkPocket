@@ -8,7 +8,7 @@
 //
 // 渲染与网格窗口在 cards.js。两处共用同一份 S.viewRows / S.qRows。
 
-import { S } from "./state.js";
+import { S, clearRenamePair } from "./state.js";
 import { K } from "../../src/keys.js";
 import { $, ICON, fmt, listEl, qListEl } from "./dom.js";
 import { itemAt, paneBox, paneRows, paintCard, findCardEl, cardOn, colsOf } from "./cards.js";
@@ -187,7 +187,7 @@ function onGridClick(e, pane) {
 }
 
 function onGridContext(e, pane) {
-  if (!cardOn(pane)) return;
+  if (!cardOn(pane)) return; clearRenamePair();   // 右键是另一种手势，不能夹在「两击对」之间
   if (S.rightDragJustEnded) { S.rightDragJustEnded = false; e.preventDefault(); return; }
   const card = e.target.closest(".bcard");
   if (!card) return;                       // 空白右键交给 boot
@@ -375,13 +375,13 @@ function restoreIndex(pane, i) {
 
 /** 切换布局：改的是「当前所在页」的设置（浏览页点改浏览页、搜索页点改搜索页），两页互不影响 */
 export function setCardMode(on, persist = true, rerender = true) {
+  clearRenamePair();   // 切换视图形态也是另一种手势
   const pane = S.viewMode === "search" ? "search" : "browse";
   const keep = rerender ? keepIndex(pane) : -1;
   if (S.editingId) cancelCardEdit();   // 正在改的那张卡先退出，否则列表层不会重铺
   if (pane === "search") S.searchCard = !!on; else S.browseCard = !!on;
   if (persist) saveCardPref();
-  applyLayoutClass();
-  syncCardMode();
+  applyLayoutClass(); syncCardMode();
   if (rerender) {
     if (S.viewMode === "browse") { S.listVer++; renderList(false); updateStatusCounts(); }
     else if (S.viewMode === "search") renderSearch(false);

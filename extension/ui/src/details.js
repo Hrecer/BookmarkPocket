@@ -1,6 +1,6 @@
 // 详情栏（由 ui/manager.js 拆分而来）
 
-import { S, nodeById, parentOf, recLinks } from "./state.js";
+import { S, nodeById, parentOf, recLinks, clearRenamePair } from "./state.js";
 import { askDeleteFromPane } from "./crud.js";
 import { childrenOf, favUrl, fmtDate, pathOf } from "./data.js";
 import { ICON, details2El, detailsEl, fmt } from "./dom.js";
@@ -103,6 +103,7 @@ export function renderDetailsPane(container, nodes, ctx) {
 }
 
 export function openNode(n) {
+  clearRenamePair();   // 打开是另一种手势：双击打开后返回，第一击只能重新待命
   if (!n) return;
   if (n.url) chrome.tabs.create({ url: n.url });
   else goTo(n.id);

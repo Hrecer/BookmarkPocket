@@ -1,13 +1,14 @@
-// 书签树的「可见行」口径：左栏与「选目标文件夹」浮层共用同一套展开逻辑。
+// 书签树的「可见行」口径：左栏 / 「选目标文件夹」浮层共用同一套展开逻辑。
 // 展开态由调用方传入——左栏用全局 expanded，浮层用自己那份 open 集合。
+// 两侧都**只显示文件夹**（Windows 导航窗格口径）：链接不进树。
 
 export function visibleRows(roots, isOpen) {
   const out = [];
   (function walk(kids, depth) {
     for (const n of kids || []) {
-      const isFolder = !n.url;
-      out.push({ node: n, depth, isFolder });
-      if (isFolder && isOpen.has(n.id)) walk(n.children || [], depth + 1);
+      if (n.url) continue;   // 链接不是导航节点：侧栏/目标选择器只列文件夹
+      out.push({ node: n, depth, isFolder: true });
+      if (isOpen.has(n.id)) walk(n.children || [], depth + 1);
     }
   })(roots, 0);
   return out;

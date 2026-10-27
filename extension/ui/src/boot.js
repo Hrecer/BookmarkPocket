@@ -3,12 +3,12 @@
 // 模块顶层只放声明；所有带副作用的接线集中到 wire()，按原顺序执行一次。
 // 这样模块之间即使互相 import（如 tree ↔ nav）也不会碰到求值顺序问题。
 
-import { S, expanded, nodeById } from "./state.js";
+import { S, nodeById, clearRenamePair } from "./state.js";
 import { K } from "../../src/keys.js";
 import { $, actionrow, busyEl, listEl, navrow, panesEl, qEl, qListEl, searchViewEl, settingsViewEl, treeEl } from "./dom.js";
 import { op, setStatus, toast } from "./chan.js";
 import { onScrollFrame } from "./virtual.js";
-import { applyTreeWindow, onTreeClick, toggleExpand } from "./tree.js";
+import { applyTreeWindow, moveTreeCursor, toggleCurrentTreeFolder } from "./tree.js";
 import { applyAllWindows, applyListWindow, clearSel, itemHeight, itemOffsetTop, renderList, selectOne, syncSelection } from "./list.js";
 import { initViewMode, moveViewInd, setCardMode, wireCardGrid } from "./card-ops.js";
 import { openNode } from "./details.js";
@@ -57,7 +57,7 @@ export function wire() {
     if (e.target.closest(".row, .bcard")) return;
     // 框选刚结束：吞掉这一下空白 click，别把框选结果清空
     if (S.suppressClick) { S.suppressClick = false; return; }
-    S.lastPane = "list"; clearSel();
+    clearRenamePair(); S.lastPane = "list"; clearSel();
   };
   listEl.addEventListener("click", onPaneBlankClick);
   qListEl.addEventListener("click", onPaneBlankClick);
@@ -103,7 +103,7 @@ export function wire() {
     if (Math.abs(e.clientX - p.x0) + Math.abs(e.clientY - p.y0) < 5) return;
     if (!S.sel.has(p.node.id)) { S.sel = new Set([p.node.id]); S.anchor = null; syncSelection(); }
     dragState.active = true; dragState.btn = p.btn; dragState.ids = [...S.sel]; dragState.pending = null;
-    S.suppressClick = true;
+    clearRenamePair(); S.suppressClick = true;   // 拖拽是另一种手势，作废改名两击对
     document.body.classList.add("dragging");
     const g = document.createElement("div");
     g.className = "dragghost";
@@ -208,18 +208,19 @@ export function wire() {
     }
     if (mod && e.key === "a") {
       e.preventDefault();
-      S.sel = new Set((S.lastPane === "tree" ? S.treeView.map((r) => r.node) : S.viewRows.map((r) => r.node)).map((n) => n.id));
+      // 左栏只显示文件夹：Ctrl+A 不把虚拟根「全部书签」纳入选中集合（它不是实体）
+      const pool = S.lastPane === "tree"
+        ? S.treeView.filter((r) => !r.isRoot).map((r) => r.node)
+        : S.viewRows.map((r) => r.node);
+      S.sel = new Set(pool.map((n) => n.id));
       syncSelection();
       return;
     }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       if (S.lastPane === "tree") {
-        // 左栏：按可见树序移动；文件夹=选中+进入，叶子=定位
-        const cur = S.sel.size ? S.treeView.findIndex((r) => S.sel.has(r.node.id)) : -1;
-        const next = Math.max(0, Math.min(S.treeView.length - 1, cur + (e.key === "ArrowDown" ? 1 : -1)));
-        const r = S.treeView[next];
-        if (r) { onTreeClick(r); ensureTreeVisible(next); }
+        const next = moveTreeCursor(e.key === "ArrowDown" ? 1 : -1);
+        if (next != null) ensureTreeVisible(next);
         return;
       }
       if (!S.viewRows.length) return;
@@ -238,11 +239,7 @@ export function wire() {
       return;
     }
     if (S.lastPane === "tree" && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
-      const r = S.treeView.find((x) => S.sel.has(x.node.id));
-      if (!r || !r.isFolder) return;
-      e.preventDefault();
-      if (e.key === "ArrowRight" && !expanded.has(r.node.id)) toggleExpand(r.node.id);
-      if (e.key === "ArrowLeft" && expanded.has(r.node.id)) toggleExpand(r.node.id);
+      if (toggleCurrentTreeFolder(e.key === "ArrowRight")) e.preventDefault();
       return;
     }
   });
