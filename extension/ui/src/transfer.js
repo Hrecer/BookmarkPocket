@@ -2,6 +2,7 @@
 
 import { S, lPool, nodeById, parentOf, qPool, tPool } from "./state.js";
 import { op, setStatus, toast } from "./chan.js";
+import { soleDrawer } from "./data.js";
 import { askDeleteFromPane, doUndo } from "./crud.js";
 import { esc, openNode } from "./details.js";
 import { $, busyEl, fmt, listEl } from "./dom.js";
@@ -44,7 +45,11 @@ export function cancelCut() {
 }
 
 export async function pasteInto(targetId) {
-  if (targetId === "0") { toast("「全部书签」是浏览器的虚拟根，不能粘贴——请先进入一个文件夹", { error: true }); return; }
+  if (targetId === "0") {
+    const d = soleDrawer();
+    if (d) targetId = d.id;
+    else { toast("「全部书签」是浏览器的虚拟根，不能粘贴——请先进入一个文件夹", { error: true }); return; }
+  }
   if (!S.clip || !S.clip.ids.length) return;
   const target = nodeById.get(targetId);
   const name = target ? (target.title || "(无标题)") : "文件夹";
@@ -73,7 +78,12 @@ export const dragState = { pending: null, active: false, btn: 0, ids: [], target
 export function isFixedRoot(id) { return parentOf.get(id) === "0"; }
 
 export function canDrop(ids, folderId) {
-  if (!folderId || folderId === "0") return false;   // 虚拟根不可作为落点
+  if (!folderId) return false;
+  if (folderId === "0") {
+    const d = soleDrawer();
+    if (!d) return false;   // 多抽屉时虚根仍不可落
+    folderId = d.id;
+  }
   const folder = nodeById.get(folderId);
   if (!folder || folder.url) return false;
   for (const id of ids) {
@@ -144,6 +154,11 @@ export function cleanupDrag() {
 }
 
 export async function executeTransfer(mode, ids, targetFolderId) {
+  if (targetFolderId === "0") {
+    const d = soleDrawer();
+    if (!d) { toast("不能移动到「全部书签」根", { error: true }); return; }
+    targetFolderId = d.id;
+  }
   const target = nodeById.get(targetFolderId);
   const name = target ? (target.title || "(无标题)") : "文件夹";
   const work = ids.filter((id) => nodeById.has(id) && parentOf.get(id) !== targetFolderId);
@@ -201,10 +216,11 @@ export function rowMenuItems(node) {
 }
 
 export function blankMenuItems() {
-  const atRoot = S.currentFolderId === "0";
+  // 单出厂抽屉时根目录对用户可写（实际写入该抽屉）
+  const rootBlocked = S.currentFolderId === "0" && !soleDrawer();
   return [
-    { label: "新建文件夹", disabled: atRoot, fn: () => newFolder() },
-    { label: "粘贴", disabled: atRoot || !S.clip || !S.clip.ids.length, fn: () => pasteInto(S.currentFolderId) },
+    { label: "新建文件夹", disabled: rootBlocked, fn: () => newFolder() },
+    { label: "粘贴", disabled: rootBlocked || !S.clip || !S.clip.ids.length, fn: () => pasteInto(S.currentFolderId) },
     "-",
     { label: "全选", fn: () => { S.sel = new Set((S.lastPane === "tree" ? S.treeView.map((r) => r.node) : S.viewRows.map((r) => r.node)).map((n) => n.id)); syncSelection(); } },
     { label: "刷新", fn: () => refresh({ busy: true, fresh: true, entering: true, counts: true }) },

@@ -221,7 +221,7 @@ function el(sel, parent) {
 
   const stv = el("section#settingsview.settingsview");
   const c1 = el("div.spanel", stv);
-  el("input#cfgPort", c1); el("input#cfgToken", c1); el("button#btnCfgPair", c1);
+  el("input#cfgHost", c1); el("input#cfgPort", c1); el("input#cfgToken", c1); el("button#btnCfgPair", c1);
   el("button#btnCfgSave", c1); el("button#btnCfgReconnect", c1);
   el("span#cfgStatus", c1);
   el("div[data-theme-set=auto]", c1); el("div[data-theme-set=light]", c1); el("div[data-theme-set=dark]", c1);
@@ -482,10 +482,12 @@ if (M) {
   ok(document.documentElement.getAttribute("data-theme") === null, "跟随系统移除 data-theme");
 
   console.log("\n— 设置页 —");
+  storage["bookmarkpocket.host"] = "192.168.1.8";
   storage["bookmarkpocket.port"] = 19127;
   storage["bookmarkpocket.token"] = "TOKEN-XYZ";
   await M.loadSettings();
   flushRaf();
+  ok($id("cfgHost").value === "192.168.1.8", "主机读回（" + $id("cfgHost").value + "）");
   ok($id("cfgPort").value === 19127, "端口读回（" + $id("cfgPort").value + "）");
   ok($id("cfgToken").value === "TOKEN-XYZ", "令牌读回");
   ok($id("cfgExtId").textContent === "test-ext-id", "扩展 ID 回填");

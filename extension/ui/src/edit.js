@@ -2,6 +2,7 @@
 
 import { S, lPool, nodeById, tPool, clearRenamePair } from "./state.js";
 import { op, setStatus, toast } from "./chan.js";
+import { soleDrawer } from "./data.js";
 import { $ } from "./dom.js";
 import { syncSelection } from "./list.js";
 import { startCardEdit } from "./card-ops.js";
@@ -77,10 +78,17 @@ export function startRenameIn(nameEl, node) {
   input.addEventListener("blur", () => finish(true));
 }
 
+function createParentId() {
+  if (S.currentFolderId !== "0") return S.currentFolderId;
+  const d = soleDrawer();
+  return d ? d.id : null;
+}
+
 export async function newFolder() {
-  if (S.currentFolderId === "0") { toast("「全部书签」是虚拟根，不能新建——请先进入一个文件夹", { error: true }); return; }
+  const parentId = createParentId();
+  if (!parentId) { toast("「全部书签」是虚拟根，不能新建——请先进入一个文件夹", { error: true }); return; }
   try {
-    const res = await op("bookmark.create", { parentId: S.currentFolderId, title: "新建文件夹" });
+    const res = await op("bookmark.create", { parentId, title: "新建文件夹" });
     await refresh({ busy: false });
     setStatus("已创建文件夹「" + (res.created.title || "新建文件夹") + "」");
     S.sel = new Set([res.created.id]);
@@ -96,10 +104,11 @@ export let editorParent = null;
 
 export function openEditor() {
   clearRenamePair();   // 打开编辑器是另一种手势，作废改名两击对
-  if (S.currentFolderId === "0") { toast("「全部书签」是虚拟根，不能新建——请先进入一个文件夹", { error: true }); return; }
+  const parentId = createParentId();
+  if (!parentId) { toast("「全部书签」是虚拟根，不能新建——请先进入一个文件夹", { error: true }); return; }
   S.editorMode = "new";
   S.editorTarget = null;
-  editorParent = S.currentFolderId;
+  editorParent = parentId;
   $("#edHeadText").textContent = "新建书签";
   $("#edTitle").value = "";
   $("#edUrl").value = "";

@@ -20,7 +20,7 @@ const ok = (cond, label, extra) => {
 
 console.log("— 键名定义 —");
 {
-  const want = ["port", "token", "keepalive", "oplog", "theme", "view", "rules"];
+  const want = ["host", "port", "token", "keepalive", "oplog", "theme", "view", "rules"];
   ok(Object.keys(K).sort().join(",") === want.sort().join(","), "K 就是这 7 个键：" + Object.keys(K).join(", "));
   const vals = Object.values(K);
   ok(vals.every((v) => v.startsWith("bookmarkpocket.")), "全部使用 bookmarkpocket. 前缀");

@@ -13,8 +13,9 @@ let shutdownReply = null;   // 等待「关闭中枢」确认的回调（一次�
 export function getState() { return { ...state }; }
 
 async function config() {
-  const o = await chrome.storage.local.get([K.port, K.token]);
-  return { port: Number(o[K.port]) || 19127, token: String(o[K.token] || "") };
+  const o = await chrome.storage.local.get([K.host, K.port, K.token]);
+  const host = String(o[K.host] || "127.0.0.1").trim() || "127.0.0.1";
+  return { host, port: Number(o[K.port]) || 19127, token: String(o[K.token] || "") };
 }
 
 function flushWaiters(ok) {
@@ -47,7 +48,7 @@ export async function connect() {
     state = { connected: false, url: null, since: null, lastError: "未配置令牌（请在设置页填写）" };
     return;
   }
-  const url = `ws://127.0.0.1:${cfg.port}/`;
+  const url = `ws://${cfg.host}:${cfg.port}/`;
   state.url = url;
   let sock;
   try { sock = new WebSocket(url); }
@@ -122,19 +123,24 @@ export async function connect() {
   };
 }
 
-// 一键配对：扩展是沙箱，读不到磁盘上的 mcp/config.json，所以由中枢开一个只绑 127.0.0.1 的
-// 端点把「端口 + 令牌」直接交出来。只在用户点「一键配对」时调用——不做静默采用，
-// 免得本机上随便一个服务占住这个端口就能把扩展引到别处去。
+// 一键配对：扩展是沙箱，读不到磁盘上的 mcp/config.json，所以由中枢开配对 HTTP
+// 把「主机 + 端口 + 令牌」交出来。远程时先在设置里填好中枢主机，再点配对。
+// 只在用户点「一键配对」时调用——不做静默采用。
 export async function pair() {
   const cfg = await config();
-  const url = `http://127.0.0.1:${cfg.port + 1}/pair.json`;
+  const url = `http://${cfg.host}:${cfg.port + 1}/pair.json`;
   let res;
   try { res = await fetch(url, { cache: "no-store" }); }
-  catch (e) { throw new Error("连不上本机中枢 " + url + "：" + ((e && e.message) || e)); }
+  catch (e) { throw new Error("连不上中枢配对端 " + url + "：" + ((e && e.message) || e)); }
   if (!res.ok) throw new Error("中枢没应答（HTTP " + res.status + "）");
   const data = await res.json().catch(() => null);
   if (!data || !data.token) throw new Error("中枢返回里没有令牌");
-  await chrome.storage.local.set({ [K.port]: Number(data.port) || cfg.port, [K.token]: String(data.token) });
+  const host = String(data.host || cfg.host || "127.0.0.1").trim() || "127.0.0.1";
+  await chrome.storage.local.set({
+    [K.host]: host,
+    [K.port]: Number(data.port) || cfg.port,
+    [K.token]: String(data.token),
+  });
   return await reconnect();
 }
 

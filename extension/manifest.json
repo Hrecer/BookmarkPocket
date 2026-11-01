@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "浏览器书签管理器：整理、搜索、批量移动书签，也能交给 AI 助手代劳",
   "permissions": ["bookmarks", "alarms", "storage", "favicon"],
-  "host_permissions": ["http://127.0.0.1/*"],
+  "host_permissions": ["http://*/*"],
   "background": { "service_worker": "background.js", "type": "module" },
   "action": { "default_title": "BookmarkPocket 书签管理器" },
   "options_page": "ui/options.html",

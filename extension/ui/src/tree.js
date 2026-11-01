@@ -9,6 +9,7 @@ import { ICON, T_ROW_H, fmt, treeEl, trowsEl, tspacer } from "./dom.js";
 import { visibleRows } from "./treewalk.js";
 import { startRenameSelected } from "./edit.js";
 import { cutClass, setRowIcon, syncSelection } from "./list.js";
+import { rootFolderChildren } from "./data.js";
 import { goTo } from "./nav.js";
 import { isFixedRoot, showCtxMenu, startDragCandidate } from "./transfer.js";
 import { applyWindow, windowBounds } from "./virtual.js";
@@ -18,7 +19,8 @@ export function buildTreeRows() {
   if (!S.rootNode) return rows;
   // 虚拟根「全部书签」：固定展开、不可折叠（与 Windows 导航窗格的顶层入口一致）
   rows.push({ node: S.rootNode, depth: 0, isFolder: true, isRoot: true });
-  for (const r of visibleRows(S.treeRoots, expanded)) rows.push({ ...r, depth: r.depth + 1 });
+  // 单出厂抽屉时跳过该层，L1 直接挂在「全部书签」下
+  for (const r of visibleRows(rootFolderChildren(), expanded)) rows.push({ ...r, depth: r.depth + 1 });
   return rows;
 }
 
