@@ -314,6 +314,11 @@ const rafQ = [];
 globalThis.requestAnimationFrame = (fn) => { rafQ.push(fn); return rafQ.length; };
 globalThis.cancelAnimationFrame = () => {};
 const flushRaf = () => { let n = 0; while (rafQ.length && n++ < 50) rafQ.shift()(0); };
+// 桩 DOM 的 dispatch 不冒泡，而页面上不少 handler 挂在容器上（如搜索页整片的空白点击）
+// —— 这里手动沿祖先链派发一次，模拟真实浏览器的冒泡路径。
+const clickThrough = (el, ev = {}) => {
+  for (let n = el; n; n = n.parentNode) n.dispatch("click", { target: el, detail: 1, ...ev });
+};
 globalThis.ResizeObserver = class { observe() {} disconnect() {} };
 globalThis.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
 const lsMap = {};
@@ -457,6 +462,32 @@ if (M) {
   flushRaf();
   ok($id("qempty").hidden === true, "有关键词后空提示收起");
   ok($id("qrows")._children.some((c) => c._classes.has("row")), "搜到了结果并铺出行");
+
+  console.log("\n— 搜索页：点空白取消选中 —");
+  {
+    const qhead = $id("searchview").querySelector(".list-head");
+    const qrow = $id("qrows")._children.find((c) => c._classes.has("row"));
+    clickThrough(qrow);
+    flushRaf();
+    ok(qrow._classes.has("sel"), "先选中一条搜索结果");
+    // 表头（名称 / 网址 / 位置 那一条）不在滚动容器里，曾经点了清不掉选中
+    clickThrough(qhead);
+    flushRaf();
+    ok(!qrow._classes.has("sel") && $id("selpill").hidden === true, "点搜索页表头（空白）取消选中");
+    clickThrough(qrow);
+    flushRaf();
+    ok(qrow._classes.has("sel"), "重新选中");
+    const chip = $id("searchview").querySelector(".qchip");
+    clickThrough(chip);
+    flushRaf();
+    ok(qrow._classes.has("sel"), "点范围胶囊（有交互的控件）不清选中");
+    const qbar = $id("q");
+    clickThrough(qbar);
+    flushRaf();
+    ok(qrow._classes.has("sel"), "点搜索输入框不清选中");
+    M.clearSel();
+    flushRaf();
+  }
   $id("q").value = "";
   await M.runSearch(false);
   flushRaf();

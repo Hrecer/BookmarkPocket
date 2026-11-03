@@ -7,7 +7,7 @@ import { flattenAll } from "./data.js";
 import { esc } from "./details.js";
 import { $, L_ROW_H, actionrow, busyEl, fmt, navrow, panesEl, qEl, qListEl, qemptyEl, qrowsEl, qspacerEl, rulesViewEl, searchViewEl, settingsViewEl } from "./dom.js";
 import { openEditorFor } from "./edit.js";
-import { cutClass, renderList, setRowIcon, syncSelection } from "./list.js";
+import { cutClass, clearSel, renderList, setRowIcon, syncSelection } from "./list.js";
 import { goTo, refresh, scrollIdIntoView, updateStatusCounts } from "./nav.js";
 import { loadSettings } from "./shell.js";
 import { copyText, showCtxMenu } from "./transfer.js";
@@ -60,6 +60,22 @@ export function moveNavInd() {
 }
 
 export const QFIELD = { title: "t", url: "u", path: "p" };
+
+/**
+ * 搜索页的「点空白 → 取消选中」。
+ * 只给 #qlist 接线是不够的：表头（名称 / 网址 / 位置 那一条）、面板之间的缝、
+ * 搜索栏下方的留白都不在滚动容器里；而文档级那条兜底 handler 又把 .searchpanes
+ * 整块排除了，于是点这些地方根本没人接，选中清不掉（浏览页没有这个问题，
+ * 因为 .list-head 不在任何排除项里）。这里整片兜住，只放行真有交互的部分。
+ */
+export function wireSearchBlankClick() {
+  searchViewEl.addEventListener("click", (e) => {
+    if (e.target.closest(".row, .bcard, .list, .details, .viewseg, .qchip, button, input, a, kbd")) return;
+    // 框选刚结束 / 拖拽尾随的那一下：别顺手把结果清空
+    if (S.suppressClick) { S.suppressClick = false; return; }
+    clearRenamePair(); S.lastPane = "list"; clearSel();
+  });
+}
 
 /**
  * 搜索页的空状态（待搜索 / 没选范围 / 无结果）。

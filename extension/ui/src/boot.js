@@ -15,7 +15,7 @@ import { openNode } from "./details.js";
 import { back, forward, refresh, up, updateNavButtons } from "./nav.js";
 import { closeEditor, newFolder, openEditor, saveEditor, startRenameSelected } from "./edit.js";
 import { askDelete, askDeleteFromPane, closeConfirm, doDeleteConfirmed, doUndo, updateSortIndicators } from "./crud.js";
-import { applySearchWindow, locateRow, moveNavInd, openSearchNode, renderSearch, runSearch, switchView } from "./search.js";
+import { applySearchWindow, locateRow, moveNavInd, openSearchNode, renderSearch, runSearch, switchView, wireSearchBlankClick } from "./search.js";
 import { blankMenuItems, cancelCut, cleanupDrag, ctxEl, doCopy, doCut, dragState, executeTransfer, hideCtxMenu, openMenuForSelection, pasteInto, resolveDropTarget, setDropHighlight, showCtxMenu, showTransferMenu } from "./transfer.js";
 import { copyPath, ensureListVisible, ensureTreeVisible, expandToCurrent, initSplitter } from "./shortcuts.js";
 import { applyTheme, cycleTheme, pollBridge, readThemeMode, refreshCfgStatus, stopHub } from "./shell.js";
@@ -61,6 +61,8 @@ export function wire() {
   };
   listEl.addEventListener("click", onPaneBlankClick);
   qListEl.addEventListener("click", onPaneBlankClick);
+  // 表头那一条与面板之间的缝不在 #qlist 里，另开一条（逻辑见 search.js）
+  wireSearchBlankClick();
 
   listEl.addEventListener("contextmenu", (e) => {
     if (S.rightDragJustEnded) { S.rightDragJustEnded = false; e.preventDefault(); return; }
