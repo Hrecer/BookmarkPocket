@@ -8,6 +8,7 @@
 // 「后台 Node 进程」；扩展也能通过 shutdown 通道要求它退出。
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -18,14 +19,43 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const CONFIG_PATH = process.env.BOOKMARKPOCKET_CONFIG || path.join(HERE, "..", "config.json");
 export const SERVER_VERSION = "0.1.0";
 
+export function isLoopbackHost(host) {
+  const h = String(host || "").toLowerCase();
+  return h === "127.0.0.1" || h === "::1" || h === "localhost";
+}
+
+function firstLanIPv4() {
+  const ifs = os.networkInterfaces();
+  for (const list of Object.values(ifs)) {
+    for (const info of list || []) {
+      if ((info.family === "IPv4" || info.family === 4) && !info.internal) return info.address;
+    }
+  }
+  return null;
+}
+
+/** 写入 pair.json、供扩展连接的主机（与 listen host 可能不同，例如 0.0.0.0） */
+export function resolvePairHost(cfg) {
+  if (cfg.pairHost) return String(cfg.pairHost);
+  const h = String(cfg.host || "127.0.0.1");
+  if (isLoopbackHost(h)) return "127.0.0.1";
+  if (h === "0.0.0.0" || h === "::") {
+    return firstLanIPv4() || "127.0.0.1";
+  }
+  return h;
+}
+
 export function loadConfig() {
   let cfg = {};
   try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8")); } catch (e) { /* 首次生成 */ }
   if (process.env.BOOKMARKPOCKET_PORT) cfg.port = Number(process.env.BOOKMARKPOCKET_PORT);
   if (process.env.BOOKMARKPOCKET_TOKEN) cfg.token = process.env.BOOKMARKPOCKET_TOKEN;
+  if (process.env.BOOKMARKPOCKET_HOST) cfg.host = process.env.BOOKMARKPOCKET_HOST;
+  if (process.env.BOOKMARKPOCKET_PAIR_HOST) cfg.pairHost = process.env.BOOKMARKPOCKET_PAIR_HOST;
   if (process.env.BOOKMARKPOCKET_ORIGINS) {
     cfg.allowedOrigins = process.env.BOOKMARKPOCKET_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean);
   }
+  cfg.host = String(cfg.host || "127.0.0.1");
   cfg.port = Number(cfg.port) || 19127;
   cfg.controlPort = Number(process.env.BOOKMARKPOCKET_CONTROL_PORT) || Number(cfg.controlPort) || cfg.port + 2;
   cfg.pairPort = Number(process.env.BOOKMARKPOCKET_PAIR_PORT) || Number(cfg.pairPort) || cfg.port + 1;
@@ -78,11 +108,22 @@ export function startHub({ cfg, log = () => {}, onShutdown = null } = {}) {
   }, 5000);
   if (heartbeat.unref) heartbeat.unref();              // 别让心跳拖住进程退出
 
-  const pairSrv = startPairServer(cfg, log);
+  const pairAdvertiseHost = resolvePairHost(cfg);
+  if (!isLoopbackHost(cfg.host) && !cfg.pairHost && (cfg.host === "0.0.0.0" || cfg.host === "::") && pairAdvertiseHost === "127.0.0.1") {
+    log("⚠ 监听 0.0.0.0 但未能推断局域网 IP，pair.json 暂用 127.0.0.1；远程配对请在 config.json 设置 pairHost");
+  }
+  const pairSrv = startPairServer(cfg, log, pairAdvertiseHost);
 
-  const wss = new WebSocketServer({ host: "127.0.0.1", port: cfg.port });
+  const wss = new WebSocketServer({ host: cfg.host, port: cfg.port });
   wss.on("listening", () => {
-    log(`中枢已监听 ws://127.0.0.1:${cfg.port}（等待浏览器扩展）`);
+    log(`中枢已监听 ws://${cfg.host}:${cfg.port}（等待浏览器扩展）`);
+    if (!isLoopbackHost(cfg.host)) {
+      log(
+        "⚠ 已监听所有网卡或非本机回环：局域网内其它设备可访问。" +
+        "请确认 token 足够随机，建议设置 allowedOrigins；" +
+        "如不想把令牌暴露到局域网，可在 config.json 里加 \"pairHost\": \"127.0.0.1\""
+      );
+    }
     startControlHub();
   });
   wss.on("error", (e) => {
@@ -173,8 +214,8 @@ export function startHub({ cfg, log = () => {}, onShutdown = null } = {}) {
   /* ---------- Agent 控制口：本机脚本 / CLI 直连（与扩展的同一套 ops 管线） ---------- */
 
   function startControlHub() {
-    controlWss = new WebSocketServer({ host: "127.0.0.1", port: cfg.controlPort });
-    controlWss.on("listening", () => log(`Agent 控制口已监听 ws://127.0.0.1:${cfg.controlPort}（脚本/CLI 通道）`));
+    controlWss = new WebSocketServer({ host: cfg.host, port: cfg.controlPort });
+    controlWss.on("listening", () => log(`Agent 控制口已监听 ws://${cfg.host}:${cfg.controlPort}（脚本/CLI 通道）`));
     controlWss.on("error", (e) => log("控制口错误:", e.message));
     controlWss.on("connection", (ws) => {
       let authed = false;
@@ -277,6 +318,8 @@ export function startHub({ cfg, log = () => {}, onShutdown = null } = {}) {
   function status() {
     return {
       mode,
+      host: cfg.host,
+      pairHost: pairAdvertiseHost,
       port: cfg.port,
       controlPort: cfg.controlPort,
       pairPort: cfg.pairPort,

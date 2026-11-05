@@ -2,7 +2,7 @@
 
 import { S, expanded, nodeById, parentOf, clearRenamePair } from "./state.js";
 import { op, setStatus, toast } from "./chan.js";
-import { childrenOf, indexTree, pathOf } from "./data.js";
+import { childrenOf, indexTree, pathOf, soleDrawer } from "./data.js";
 import { esc } from "./details.js";
 import { $, busyEl, crumbsEl, fmt, listEl, qEl } from "./dom.js";
 import { applyListWindow, itemHeight, itemOffsetTop, renderList, syncSelection } from "./list.js";
@@ -18,10 +18,13 @@ export async function goTo(id, opts = {}) {
 // 平级跳转 / 进入子目录都返回 null。
 function childOnPath(ancestorId, descendantId) {
   let cur = descendantId;
+  const sole = soleDrawer();
   while (cur && cur !== ancestorId) {
     const p = parentOf.get(cur);
     if (!p) return null;
     if (p === ancestorId) return cur;
+    // 唯一出厂抽屉对用户透明：从 L1 退回「全部书签」时仍应选中该 L1
+    if (ancestorId === "0" && sole && p === sole.id) return cur;
     cur = p;
   }
   return null;
@@ -77,7 +80,10 @@ export async function forward() {
 
 export function up() {
   if (S.currentFolderId === "0") return;
-  goTo(parentOf.get(S.currentFolderId) || "0", { selectExitedChild: true });
+  let p = parentOf.get(S.currentFolderId) || "0";
+  const sole = soleDrawer();
+  if (sole && p === sole.id) p = "0";   // 跳过透明的唯一出厂抽屉
+  goTo(p, { selectExitedChild: true });
 }
 
 export function renderCrumbs() {

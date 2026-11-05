@@ -78,8 +78,9 @@ ok("包含批量工具 bookmark_move_many / bookmark_create_many",
 
 const pairRes = await fetch(`http://127.0.0.1:${PORT + 1}/pair.json`).catch(() => null);
 const pairData = pairRes && pairRes.ok ? await pairRes.json() : null;
-ok("一键配对端可读（把端口与令牌交给扩展）",
-   !!pairData && pairData.token === TOKEN && pairData.port === PORT, JSON.stringify(pairData));
+ok("一键配对端可读（把主机、端口与令牌交给扩展）",
+   !!pairData && pairData.token === TOKEN && pairData.port === PORT && pairData.host === "127.0.0.1",
+   JSON.stringify(pairData));
 
 const r1 = await client.callTool({ name: "bridge_status", arguments: {} });
 ok("bridge_status 全链路（stdio→中枢→扩展→回）", !r1.isError && r1.content[0].text.includes("\"connected\": true"));

@@ -4,7 +4,6 @@
 // 这样模块之间即使互相 import（如 tree ↔ nav）也不会碰到求值顺序问题。
 
 import { S, nodeById, clearRenamePair } from "./state.js";
-import { K } from "../../src/keys.js";
 import { $, actionrow, busyEl, listEl, navrow, panesEl, qEl, qListEl, searchViewEl, settingsViewEl, treeEl } from "./dom.js";
 import { op, setStatus, toast } from "./chan.js";
 import { onScrollFrame } from "./virtual.js";
@@ -18,7 +17,7 @@ import { askDelete, askDeleteFromPane, closeConfirm, doDeleteConfirmed, doUndo, 
 import { applySearchWindow, locateRow, moveNavInd, openSearchNode, renderSearch, runSearch, switchView, wireSearchView } from "./search.js";
 import { blankMenuItems, cancelCut, cleanupDrag, ctxEl, doCopy, doCut, dragState, executeTransfer, hideCtxMenu, openMenuForSelection, pasteInto, resolveDropTarget, setDropHighlight, showCtxMenu, showTransferMenu } from "./transfer.js";
 import { copyPath, ensureListVisible, ensureTreeVisible, expandToCurrent, initSplitter } from "./shortcuts.js";
-import { applyTheme, cycleTheme, pollBridge, readThemeMode, refreshCfgStatus, stopHub } from "./shell.js";
+import { applyTheme, cycleTheme, pollBridge, readThemeMode, stopHub, wireBridgeSettings } from "./shell.js";
 import { wireRulesView } from "./rulesview.js";
 
 // 单帧位移超过约一屏 → 判为「超大幅滚动」：这期间先不加载 favicon（图片解码是最大头），
@@ -310,38 +309,7 @@ export function wire() {
     runSearch(false);
   });
 
-  // 一键配对：向本机中枢索取端口与令牌并落存，省掉手抄。失败仍可回到手填。
-  $("#btnCfgPair").addEventListener("click", async () => {
-    $("#cfgStatus").textContent = "正在向本机中枢索取端口与令牌…";
-    try {
-      const r = await op("sys.bridge.pair");
-      $("#cfgStatus").textContent = r.connected ? "已连接 " + r.url : "未连接：" + (r.lastError || "请确认 mcp 中枢已启动");
-      await refreshCfgStatus();
-      pollBridge();
-    } catch (e) { $("#cfgStatus").textContent = "配对失败：" + ((e && e.message) || e); }
-  });
-
-  $("#btnCfgSave").addEventListener("click", async () => {
-    try {
-      await chrome.storage.local.set({
-        [K.port]: Number($("#cfgPort").value) || 19127,
-        [K.token]: $("#cfgToken").value.trim(),
-      });
-      const r = await op("sys.bridge.reconnect");
-      $("#cfgStatus").textContent = r.connected ? "已连接 " + r.url : "未连接：" + (r.lastError || "请确认 mcp 中枢已启动");
-      pollBridge();
-      setTimeout(refreshCfgStatus, 900);
-    } catch (e) { $("#cfgStatus").textContent = "失败：" + ((e && e.message) || e); }
-  });
-
-  $("#btnCfgReconnect").addEventListener("click", async () => {
-    try {
-      const r = await op("sys.bridge.reconnect");
-      $("#cfgStatus").textContent = r.connected ? "已连接 " + r.url : "未连接：" + (r.lastError || "等待中枢");
-      pollBridge();
-      setTimeout(refreshCfgStatus, 900);
-    } catch (e) { $("#cfgStatus").textContent = "失败：" + ((e && e.message) || e); }
-  });
+  wireBridgeSettings();
 
   $("#btnTheme").addEventListener("click", cycleTheme);
 

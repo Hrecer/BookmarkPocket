@@ -11,6 +11,7 @@
 const PREFIX = "bookmarkpocket.";
 
 export const K = {
+  host: PREFIX + "host",
   port: PREFIX + "port",
   token: PREFIX + "token",
   keepalive: PREFIX + "keepalive",

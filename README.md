@@ -16,9 +16,11 @@ It works on the browser's own bookmarks. Nothing is copied anywhere else, so the
 
 1. **Load the extension** — open `edge://extensions` (or `chrome://extensions`), enable Developer mode, click *Load unpacked*, and select the `extension/` folder.
 2. **Start the local hub** — `cd mcp && npm install && npm start`. On first run it creates `config.json` and prints the path.
-3. **Pair** — open the manager, go to **Settings**, and click **One-click pairing**. The port and token are filled in for you.
+3. **Pair** — open the manager, go to **Settings**, and click **One-click pairing**. The host, port and token are filled in for you.
 
 That's the whole setup. From then on the extension reconnects on its own.
+
+To expose the hub on the LAN (another device’s extension connecting in), set `"host": "0.0.0.0"` in `mcp/config.json`, keep a strong `token`, set `allowedOrigins`, and optionally `pairHost` to the address extensions should dial. On the remote browser, put that host in Settings before one-click pairing.
 
 ## Using it
 
@@ -70,7 +72,7 @@ Register the MCP server with your host:
 
 The assistant gets 15 tools: read the tree, search, create, rename, move, bulk move, bulk create, delete, undo, check the connection, and read/write/apply the routing rules.
 
-The local hub listens on `127.0.0.1` only, guarded by a token and an origin allowlist.
+By default the hub listens on `127.0.0.1` only, guarded by a token and an origin allowlist. Set `host` in `config.json` to bind elsewhere.
 
 ## Tests
 

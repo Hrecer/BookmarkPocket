@@ -35,8 +35,19 @@ export function flattenAll(node, path, out) {
   return out;
 }
 
+// 部分浏览器（如本机这份）只有一个出厂抽屉「Bookmarks」，无法把分类挂到虚根 id=0。
+// 此时把该抽屉视为透明：全部书签下直接露出其一级子文件夹。
+export function soleDrawer() {
+  return S.treeRoots.length === 1 && S.treeRoots[0] && !S.treeRoots[0].url ? S.treeRoots[0] : null;
+}
+
+export function rootFolderChildren() {
+  const d = soleDrawer();
+  return d ? (d.children || []) : S.treeRoots;
+}
+
 export function childrenOf(id) {
-  if (id === "0") return S.treeRoots;
+  if (id === "0") return rootFolderChildren();
   const n = nodeById.get(id);
   return (n && n.children) || [];
 }
@@ -49,6 +60,9 @@ export function pathOf(id) {
     const n = nodeById.get(cur);
     if (n) segs.unshift(n);
   }
+  // 面包屑跳过唯一出厂抽屉，避免「全部书签 › Bookmarks › 网络」
+  const d = soleDrawer();
+  if (d && segs[0] && segs[0].id === d.id) segs.shift();
   return segs;
 }
 
@@ -85,7 +99,11 @@ export function sortSearchRows(rows) {
 }
 
 export function folderRows(id) {
-  if (id === "0") return S.treeRoots.slice();   // 出厂抽屉（收藏夹栏/其他收藏夹）：浏览器写死的顺序，不参与排序
+  // 根目录：多抽屉时列出厂抽屉；单抽屉时直接列出其内容（对用户等于「全部书签」根）
+  if (id === "0") {
+    if (!soleDrawer()) return S.treeRoots.slice();
+    // fall through：按普通文件夹排 sole drawer 的孩子
+  }
   const kids = childrenOf(id);
   const folders = [], links = [];
   for (const n of kids) (n.url ? links : folders).push(n);

@@ -56,7 +56,8 @@ export function cycleTheme() {
 
 export async function loadSettings() {
   try {
-    const o = await chrome.storage.local.get([K.port, K.token]);
+    const o = await chrome.storage.local.get([K.host, K.port, K.token]);
+    $("#cfgHost").value = o[K.host] || "127.0.0.1";
     $("#cfgPort").value = o[K.port] || 19127;
     $("#cfgToken").value = o[K.token] || "";
   } catch (e) { /* ignore */ }
@@ -126,4 +127,44 @@ export async function pollBridge() {
     $("#bridgebox").title = s.connected ? "桥已连接 " + s.url : "桥未连接：" + (s.lastError || "");
     refreshCfgStatus();
   } catch (e) { /* ignore */ }
+}
+
+function readHostPort() {
+  return {
+    [K.host]: ($("#cfgHost").value || "127.0.0.1").trim() || "127.0.0.1",
+    [K.port]: Number($("#cfgPort").value) || 19127,
+  };
+}
+
+export function wireBridgeSettings() {
+  $("#btnCfgPair").addEventListener("click", async () => {
+    $("#cfgStatus").textContent = "正在向中枢索取主机、端口与令牌…";
+    try {
+      await chrome.storage.local.set(readHostPort());
+      const r = await op("sys.bridge.pair");
+      $("#cfgStatus").textContent = r.connected ? "已连接 " + r.url : "未连接：" + (r.lastError || "请确认 mcp 中枢已启动");
+      await loadSettings();
+      await refreshCfgStatus();
+      pollBridge();
+    } catch (e) { $("#cfgStatus").textContent = "配对失败：" + ((e && e.message) || e); }
+  });
+
+  $("#btnCfgSave").addEventListener("click", async () => {
+    try {
+      await chrome.storage.local.set({ ...readHostPort(), [K.token]: $("#cfgToken").value.trim() });
+      const r = await op("sys.bridge.reconnect");
+      $("#cfgStatus").textContent = r.connected ? "已连接 " + r.url : "未连接：" + (r.lastError || "请确认 mcp 中枢已启动");
+      pollBridge();
+      setTimeout(refreshCfgStatus, 900);
+    } catch (e) { $("#cfgStatus").textContent = "失败：" + ((e && e.message) || e); }
+  });
+
+  $("#btnCfgReconnect").addEventListener("click", async () => {
+    try {
+      const r = await op("sys.bridge.reconnect");
+      $("#cfgStatus").textContent = r.connected ? "已连接 " + r.url : "未连接：" + (r.lastError || "等待中枢");
+      pollBridge();
+      setTimeout(refreshCfgStatus, 900);
+    } catch (e) { $("#cfgStatus").textContent = "失败：" + ((e && e.message) || e); }
+  });
 }
