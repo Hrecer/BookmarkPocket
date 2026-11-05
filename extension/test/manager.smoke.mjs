@@ -210,7 +210,10 @@ function el(sel, parent) {
   el("button#btnQDelete", acts);
   const sp = el("div.searchpanes", sv);
   const card2 = el("section.list-card", sp);
-  el("div.list-head", card2);
+  const qhead = el("div#qlisthead.list-head", card2);
+  el('button.col.col-name[qsort="title"]', qhead).appendChild(el("span.sortind"));
+  el('button.col.col-url[qsort="url"]', qhead).appendChild(el("span.sortind"));
+  el('button.col.col-loc[qsort="path"]', qhead).appendChild(el("span.sortind"));
   const qlist = el("div#qlist.list", card2);
   el("div#qspacer", qlist);
   el("div#qrows", qlist);
@@ -487,6 +490,33 @@ if (M) {
     ok(qrow._classes.has("sel"), "点搜索输入框不清选中");
     M.clearSel();
     flushRaf();
+  }
+
+  console.log("\n— 搜索页：排序 / 文件夹优先 —");
+  {
+    $id("q").value = "书";
+    await M.runSearch(true);
+    flushRaf();
+    const qrows = () => $id("qrows")._children.filter((c) => c._classes.has("row") && c.style.display !== "none");
+    const namesOf = (folder) => qrows().filter((r) => r._classes.has("folder") === folder).map((r) => r._.nm.textContent);
+    const coll = new Intl.Collator("zh-CN");
+    const asc = (a) => a.every((v, i) => i === 0 || coll.compare(a[i - 1], v) <= 0);
+    const desc = (a) => a.every((v, i) => i === 0 || coll.compare(a[i - 1], v) >= 0);
+    ok(qrows().length === 6, "「书」命中 3 个文件夹 + 3 个书签", String(qrows().length));
+    ok(qrows().slice(0, 3).every((r) => r._classes.has("folder")), "文件夹块恒在书签上面");
+    ok(asc(namesOf(true)) && asc(namesOf(false)), "默认按名称升序");
+    const heads = $id("qlisthead")._children.filter((c) => c._classes.has("col"));
+    const titleHead = heads.find((b) => b.dataset.qsort === "title");
+    clickThrough(titleHead);
+    flushRaf();
+    ok(titleHead._children[0].textContent === "▼", "再点名称表头切换为降序");
+    ok(qrows().slice(0, 3).every((r) => r._classes.has("folder")), "降序时文件夹仍在书签上面");
+    ok(desc(namesOf(true)) && desc(namesOf(false)), "降序只作用于块内");
+    const pathHead = heads.find((b) => b.dataset.qsort === "path");
+    clickThrough(pathHead);
+    flushRaf();
+    ok(pathHead._children[0].textContent === "▲" && titleHead._children[0].textContent === "", "切换排序字段后指示器转移");
+    ok(qrows().slice(0, 3).every((r) => r._classes.has("folder")), "按位置排序：文件夹仍在最上");
   }
   $id("q").value = "";
   await M.runSearch(false);

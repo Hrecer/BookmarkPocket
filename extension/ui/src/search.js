@@ -3,7 +3,7 @@
 import { S, nodeById, parentOf, qPool, clearRenamePair } from "./state.js";
 import { setStatus, toast } from "./chan.js";
 import { askDeleteFromPane } from "./crud.js";
-import { flattenAll } from "./data.js";
+import { flattenAll, sortSearchRows } from "./data.js";
 import { esc } from "./details.js";
 import { $, L_ROW_H, actionrow, busyEl, fmt, navrow, panesEl, qEl, qListEl, qemptyEl, qrowsEl, qspacerEl, rulesViewEl, searchViewEl, settingsViewEl } from "./dom.js";
 import { openEditorFor } from "./edit.js";
@@ -68,7 +68,12 @@ export const QFIELD = { title: "t", url: "u", path: "p" };
  * 整块排除了，于是点这些地方根本没人接，选中清不掉（浏览页没有这个问题，
  * 因为 .list-head 不在任何排除项里）。这里整片兜住，只放行真有交互的部分。
  */
-export function wireSearchBlankClick() {
+export function wireSearchView() {
+  wireSearchBlankClick();
+  wireQSort();
+}
+
+function wireSearchBlankClick() {
   searchViewEl.addEventListener("click", (e) => {
     if (e.target.closest(".row, .bcard, .list, .details, .viewseg, .qchip, button, input, a, kbd")) return;
     // 框选刚结束 / 拖拽尾随的那一下：别顺手把结果清空
@@ -108,15 +113,45 @@ export async function runSearch(entering = true) {
   // 全库展平表按需构建：几万条书签建一次要几十毫秒外加一堆垃圾对象，
   // 而绝大多数操作（切文件夹、增删改）根本用不到它。数据一变就作废重建。
   if (!S.allRows) S.allRows = flattenAll(S.rootNode, "", []);
-  S.qRows = S.allRows.filter((r) => scopes.some((k) => r[k].includes(q))).map((r) => ({ row: r }));
+  const hits = S.allRows.filter((r) => scopes.some((k) => r[k].includes(q)));
+  S.qRows = sortSearchRows(hits).map((r) => ({ row: r }));
   qemptyEl.hidden = S.qRows.length > 0;
   if (!S.qRows.length) {
-    $("#qemptytitle").textContent = "没有找到匹配的书签";
+    $("#qemptytitle").textContent = "没有找到匹配的书签或文件夹";
     $("#qemptydesc").textContent = "试试更短的关键词，或放宽搜索范围";
   }
-  setStatus("搜索「" + raw + "」：找到 " + fmt.format(S.qRows.length) + " 条");
+  const folders = S.qRows.filter((r) => r.row.isFolder).length;
+  setStatus("搜索「" + raw + "」：找到 " + fmt.format(S.qRows.length) + " 条（" +
+    fmt.format(folders) + " 个文件夹 / " + fmt.format(S.qRows.length - folders) + " 个书签）");
   renderSearch(entering);
   busyEl.hidden = true;
+}
+
+function wireQSort() {
+  const head = $("#qlisthead");
+  if (!head) return;
+  head.querySelectorAll("button.col").forEach((btn) => {
+    btn.addEventListener("click", () => setQSort(btn.dataset.qsort));
+  });
+  updateQSortIndicators();
+}
+
+function updateQSortIndicators() {
+  const head = $("#qlisthead");
+  if (!head) return;
+  head.querySelectorAll("button.col").forEach((btn) => {
+    const ind = btn.querySelector(".sortind");
+    if (!ind) return;
+    ind.textContent = btn.dataset.qsort === S.qSort.field ? (S.qSort.dir > 0 ? "▲" : "▼") : "";
+  });
+}
+
+export function setQSort(field) {
+  if (S.qSort.field === field) S.qSort.dir = -S.qSort.dir;
+  else { S.qSort.field = field; S.qSort.dir = 1; }
+  S.qanchor = null;   // 顺序变了，旧的区间锚点不再是原来的位置
+  updateQSortIndicators();
+  if (qEl.value.trim()) runSearch(false);
 }
 
 // 命中高亮：转义后按关键词包 <mark>（不区分大小写）

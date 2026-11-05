@@ -44,6 +44,7 @@ export const S = {
   renamePair: { id: null, t: 0 },
   qanchor: null,
   qActive: { title: true, url: true, path: true },
+  qSort: { field: "title", dir: 1 },
   qLast: "",
   clip: null,
   suppressClick: false,

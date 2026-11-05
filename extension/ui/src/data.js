@@ -62,6 +62,28 @@ export function sortCmp() {
   };
 }
 
+export function qSortCmp() {
+  const { field, dir } = S.qSort;
+  const byTitle = (a, b) => TITLE_COLLATOR.compare(a.title || "", b.title || "");
+  return (a, b) => {
+    let v;
+    if (field === "url") v = TITLE_COLLATOR.compare(a.url || "", b.url || "");
+    else if (field === "path") v = TITLE_COLLATOR.compare(a.path || "", b.path || "");
+    else v = byTitle(a, b);
+    if (v === 0 && field !== "title") v = byTitle(a, b);
+    return v * dir;
+  };
+}
+
+// 搜索结果：文件夹块恒在书签块之前，两块各自按当前排序键排（方向只作用于块内）
+export function sortSearchRows(rows) {
+  const cmp = qSortCmp();
+  const folders = [], links = [];
+  for (const r of rows) (r.isFolder ? folders : links).push(r);
+  folders.sort(cmp); links.sort(cmp);
+  return folders.concat(links);
+}
+
 export function folderRows(id) {
   if (id === "0") return S.treeRoots.slice();   // 出厂抽屉（收藏夹栏/其他收藏夹）：浏览器写死的顺序，不参与排序
   const kids = childrenOf(id);

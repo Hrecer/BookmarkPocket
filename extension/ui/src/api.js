@@ -8,7 +8,7 @@ export { renderDetails, renderDetailsPane } from "./details.js";
 export { newFolder, openEditor, saveEditor, startRenameSelected } from "./edit.js";
 export { applyAllWindows, applyListWindow, clearSel, renderList, selectOne, syncSelection } from "./list.js";
 export { back, forward, goTo, navigate, refresh, renderCrumbs, up } from "./nav.js";
-export { locateRow, renderSearch, runSearch, switchView } from "./search.js";
+export { locateRow, renderSearch, runSearch, setQSort, switchView } from "./search.js";
 export { openRulesPicker, pickChoose, pickToggle, refreshRulesUI } from "./rulesview.js";
 export { applyTheme, cycleTheme, loadSettings, readThemeMode } from "./shell.js";
 export { expandToCurrent } from "./shortcuts.js";
