@@ -157,6 +157,7 @@ button.col:hover { color: var(--fg); }
 
 .cell-name { display: flex; align-items: center; gap: 0; min-width: 0; }
 .cell-name .ico { width: 20px; height: 20px; flex: none; display: grid; place-items: center; color: var(--fg-dim); }
+.ico-ph { display: grid; place-items: center; }
 .cell-name .ico svg { width: 17px; height: 17px; }
 .cell-name .ico img { width: 16px; height: 16px; border-radius: 4px; }
 .cell-name .nm { font-size: 14px; margin-left: 10px; overflow: hidden; text-overflow: ellipsis; min-width: 0; }

@@ -531,6 +531,38 @@ if (M) {
   ok(M.childrenOf("1").length === 3 && M.childrenOf("10").length === 1, "childrenOf 按层取子节点");
   ok(M.pathOf("100").length >= 1, "pathOf 能回溯路径");
 
+  console.log("\n— 行图标复用 —");
+  {
+    const ico = document.createElement("span");
+    const A = { url: "https://a.example/page" };
+    const B = { url: "https://b.example/page" };
+    M.setRowIcon(ico, A, false);
+    ok(ico._ph.hidden === false && ico._img.hidden === true, "新图标先显示占位，不透出上一行");
+    ok(ico._img.src.includes(encodeURIComponent(A.url)), "占位期间已开始加载 favicon");
+    ico._img.onload();
+    ok(ico._img.hidden === false && ico._ph.hidden === true, "favicon 就绪后切到图片");
+    const srcA = ico._img.src;
+    M.setRowIcon(ico, B, false);
+    ok(ico._img.hidden === true && ico._ph.hidden === false, "换行时旧 favicon 立即隐藏");
+    ok(ico._img.src !== srcA, "开始加载新 favicon");
+    ico._img.onload();
+    ok(ico._img.hidden === false, "新 favicon 就绪后显示");
+    M.S.fastScroll = true;
+    M.setRowIcon(ico, { url: "https://c.example/page" }, false);
+    ok(ico._img.hidden === true && ico._ph.hidden === false && ico._k === "l",
+      "快速滚动中不保留旧图标，也不加载新图");
+    M.S.fastScroll = false;
+    M.setRowIcon(ico, { url: "https://c.example/page" }, false);
+    ok(ico._ph.hidden === false && ico._k === "l", "停滚后重新进入加载态");
+    ico._img.onload();
+    ok(ico._img.hidden === false, "停滚后的 favicon 正常显示");
+    M.setRowIcon(ico, { url: "" }, true);
+    ok(ico._ph.hidden === false && ico._img.hidden === true && ico._phKey === "f",
+      "文件夹图标不受影响");
+    M.setStaticIcon(ico, "nav");
+    ok(ico._phKey === "nav" && ico._ph.hidden === false, "虚拟根图标走同一图标槽");
+  }
+
   console.log("\n— 外观 —");
   M.applyTheme("dark", true);
   ok(document.documentElement.getAttribute("data-theme") === "dark", "固定深色写入 data-theme");

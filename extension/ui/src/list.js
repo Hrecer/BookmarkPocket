@@ -43,23 +43,84 @@ export function makeListRow() {
   return el;
 }
 
-// 行图标：复用同一个 <img>，只换 src。
-// 重建 <img> 会让浏览器对同一张 favicon 重新走一次加载 + 解码 ——
-// 滚动时每帧重建几十个 <img> 是「图标列发白 + 掉帧」的主因。
+// 行图标：图标槽固定为「占位图标 + 常驻 <img>」两个节点。
+// 必须复用同一个 <img>，只换 src —— 重建 <img> 会让浏览器对同一张 favicon
+// 重新走一次加载 + 解码，滚动时每帧重建几十个就是「图标列发白 + 掉帧」的主因。
+// 换图时先把占位图标露出来：复用行绝不能继续画着上一个链接的 favicon，
+// 等新 favicon 就绪后再切到 <img>。
+function ensureIconSlot(ico) {
+  const ph = document.createElement("span");
+  ph.className = "ico-ph";
+  const img = document.createElement("img");
+  img.alt = "";
+  img.decoding = "async";
+  img.hidden = true;
+  ico.replaceChildren(ph, img);
+  ico._ph = ph;
+  ico._img = img;
+  ico._phKey = "";
+  ico._k = "";
+  ico._want = null;
+  ico._tok = 0;
+}
+
+function showIconPlaceholder(ico, kind) {
+  if (ico._phKey !== kind) { ico._ph.innerHTML = ICON[kind]; ico._phKey = kind; }
+  ico._ph.hidden = false;
+  ico._img.hidden = true;
+  ico._k = kind;
+}
+
+function showIconImage(ico, key) {
+  ico._want = null;
+  ico._k = key;
+  ico._ph.hidden = true;
+  ico._img.hidden = false;
+}
+
+export function setStaticIcon(ico, kind) {
+  if (!ico._ph) ensureIconSlot(ico);
+  if (ico._k === kind && !ico._want) return;
+  ico._tok = (ico._tok | 0) + 1;
+  ico._want = null;
+  showIconPlaceholder(ico, kind);
+}
+
 export function setRowIcon(ico, n, isFolder) {
-  if (S.fastScroll) return;   // 超大幅滚动中：先不加载 favicon（解码是大头），停稳后整窗重绘补上
-  if (isFolder) {
-    if (ico._k !== "f") { ico._k = "f"; ico.innerHTML = ICON.folder; }
-    return;
-  }
+  if (!ico._ph) ensureIconSlot(ico);
+  if (isFolder) { setStaticIcon(ico, "f"); return; }
   const fav = n.url && /^https?:/i.test(n.url) ? favUrl(n.url) : "";
   const key = fav || "l";
-  if (ico._k === key) return;
-  ico._k = key;
-  if (!fav) { ico.innerHTML = ICON.link; return; }
-  let img = ico.firstElementChild;
-  if (!img || img.tagName !== "IMG") { ico.innerHTML = '<img alt="" loading="lazy" decoding="async">'; img = ico.firstElementChild; }
-  img.onerror = () => { ico._k = "l"; ico.innerHTML = ICON.link; };
+  if (ico._k === key && !ico._want) return;
+  if (S.fastScroll) {
+    // 超大幅滚动中：不加载 favicon（解码是大头），但必须立刻撤掉复用行上一行的图标
+    if (ico._k !== "l" || ico._want) {
+      ico._tok = (ico._tok | 0) + 1;
+      ico._want = null;
+      showIconPlaceholder(ico, "l");
+    }
+    return;
+  }
+  if (ico._want === key) return;   // 同一个 favicon 正在加载：先让占位图标顶着
+  ico._tok = (ico._tok | 0) + 1;
+  ico._want = null;
+  showIconPlaceholder(ico, "l");
+  if (!fav) return;
+  const token = ico._tok;
+  const img = ico._img;
+  ico._want = key;
+  img.onload = () => { if (ico._tok === token) showIconImage(ico, key); };
+  img.onerror = () => {
+    if (ico._tok !== token) return;
+    ico._want = null;
+    ico._k = "l";
+    ico._ph.hidden = false;
+    ico._img.hidden = true;
+  };
+  if (img.getAttribute("src") === fav) {
+    if (img.complete && img.naturalWidth) { showIconImage(ico, key); return; }
+    if (img.complete) img.removeAttribute("src");   // 上一次加载失败：清掉后重试
+  }
   img.src = fav;
 }
 

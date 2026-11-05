@@ -8,7 +8,7 @@ import { S, expanded, recLinks, tPool, clearRenamePair } from "./state.js";
 import { ICON, T_ROW_H, fmt, treeEl, trowsEl, tspacer } from "./dom.js";
 import { visibleRows } from "./treewalk.js";
 import { startRenameSelected } from "./edit.js";
-import { cutClass, setRowIcon, syncSelection } from "./list.js";
+import { cutClass, setRowIcon, setStaticIcon, syncSelection } from "./list.js";
 import { goTo } from "./nav.js";
 import { isFixedRoot, showCtxMenu, startDragCandidate } from "./transfer.js";
 import { applyWindow, windowBounds } from "./virtual.js";
@@ -96,7 +96,7 @@ export function updateTreeRow(el, r, idx) {
   o.chev.classList.toggle("empty", isRoot || !(r.isFolder && (n.children || []).length));
   el.style.paddingLeft = 6 + r.depth * 20 + "px";
   if (isRoot) {
-    o.ico.innerHTML = ICON.nav;   // 虚拟根画书签图标（与文件夹区分）
+    setStaticIcon(o.ico, "nav");   // 虚拟根画书签图标（与文件夹区分）
   } else {
     setRowIcon(o.ico, n, r.isFolder);
   }
