@@ -64,8 +64,13 @@ function ensureIconSlot(ico) {
   ico._tok = 0;
 }
 
+const PLACEHOLDER_ICON = { f: ICON.folder, l: ICON.link, nav: ICON.nav };
+
 function showIconPlaceholder(ico, kind) {
-  if (ico._phKey !== kind) { ico._ph.innerHTML = ICON[kind]; ico._phKey = kind; }
+  if (ico._phKey !== kind) {
+    ico._ph.innerHTML = PLACEHOLDER_ICON[kind] || ICON.link;
+    ico._phKey = kind;
+  }
   ico._ph.hidden = false;
   ico._img.hidden = true;
   ico._k = kind;

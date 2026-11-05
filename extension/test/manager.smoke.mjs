@@ -538,6 +538,7 @@ if (M) {
     const B = { url: "https://b.example/page" };
     M.setRowIcon(ico, A, false);
     ok(ico._ph.hidden === false && ico._img.hidden === true, "新图标先显示占位，不透出上一行");
+    ok(ico._ph.innerHTML.includes("<svg"), "占位图标是真实 SVG，不是 undefined 文本");
     ok(ico._img.src.includes(encodeURIComponent(A.url)), "占位期间已开始加载 favicon");
     ico._img.onload();
     ok(ico._img.hidden === false && ico._ph.hidden === true, "favicon 就绪后切到图片");
@@ -559,8 +560,11 @@ if (M) {
     M.setRowIcon(ico, { url: "" }, true);
     ok(ico._ph.hidden === false && ico._img.hidden === true && ico._phKey === "f",
       "文件夹图标不受影响");
+    ok(ico._ph.innerHTML.includes("<svg") && !ico._ph.innerHTML.includes("undefined"),
+      "文件夹占位图标渲染正常");
     M.setStaticIcon(ico, "nav");
     ok(ico._phKey === "nav" && ico._ph.hidden === false, "虚拟根图标走同一图标槽");
+    ok(ico._ph.innerHTML.includes("<svg"), "虚拟根占位图标渲染正常");
   }
 
   console.log("\n— 外观 —");
