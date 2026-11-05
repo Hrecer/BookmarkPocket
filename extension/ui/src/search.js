@@ -7,7 +7,7 @@ import { flattenAll, sortSearchRows } from "./data.js";
 import { esc } from "./details.js";
 import { $, L_ROW_H, actionrow, busyEl, fmt, navrow, panesEl, qEl, qListEl, qemptyEl, qrowsEl, qspacerEl, rulesViewEl, searchViewEl, settingsViewEl } from "./dom.js";
 import { openEditorFor } from "./edit.js";
-import { cutClass, clearSel, renderList, setRowIcon, syncSelection } from "./list.js";
+import { cutClass, clearSel, prefetchFavicons, renderList, setRowIcon, syncSelection } from "./list.js";
 import { goTo, refresh, scrollIdIntoView, updateStatusCounts } from "./nav.js";
 import { loadSettings } from "./shell.js";
 import { copyText, showCtxMenu } from "./transfer.js";
@@ -248,6 +248,7 @@ function applySearchRowWindow(entering) {
   // 行区间没变、数据也没换版 → 不动 DOM
   if (!entering && qPool._first === b.first && qPool._last === b.last && qPool._seenVer === S.qVer) return;
   qPool._first = b.first; qPool._last = b.last; qPool._seenVer = S.qVer;
+  prefetchFavicons(S.qRows, b.first, b.last, (r) => (r.row.isFolder ? "" : r.row.url));
   applyWindow(qPool, qrowsEl, makeQRow, b, L_ROW_H, S.qVer, (el, idx) => {
     updateQRow(el, S.qRows[idx], idx);
     if (entering) el.classList.add("enter");

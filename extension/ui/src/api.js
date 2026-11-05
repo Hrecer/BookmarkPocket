@@ -7,7 +7,7 @@ export { askDelete, askDeleteFromPane, doDeleteConfirmed, doUndo } from "./crud.
 export { childrenOf, favUrl, flattenAll, fmtDate, folderRows, indexTree, pathOf, sortCmp } from "./data.js";
 export { renderDetails, renderDetailsPane } from "./details.js";
 export { newFolder, openEditor, saveEditor, startRenameSelected } from "./edit.js";
-export { applyAllWindows, applyListWindow, clearSel, favCache, renderList, selectOne, setRowIcon, setStaticIcon, syncSelection } from "./list.js";
+export { applyAllWindows, applyListWindow, clearSel, favCache, prefetchFavicons, renderList, selectOne, setRowIcon, setStaticIcon, syncSelection } from "./list.js";
 export { back, forward, goTo, navigate, refresh, renderCrumbs, up } from "./nav.js";
 export { locateRow, renderSearch, runSearch, setQSort, switchView } from "./search.js";
 export { openRulesPicker, pickChoose, pickToggle, refreshRulesUI } from "./rulesview.js";

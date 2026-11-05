@@ -540,14 +540,13 @@ if (M) {
     const favA = M.favUrl(A.url);
     const favB = M.favUrl(B.url);
     M.setRowIcon(ico, A, false);
-    ok(ico._ph.hidden === false && ico._cv.hidden === true, "新图标先显示占位，不透出上一行");
-    ok(ico._ph.innerHTML.includes("<svg"), "占位图标是真实 SVG，不是 undefined 文本");
+    ok(ico._ph.hidden === true && ico._cv.hidden === true, "加载中图标位留空，不显示占位");
     const ea = M.favCache.get(favA);
     ok(!!ea && ea.img.src === favA, "favicon 进入后台加载缓存");
     ea.img.onload();
     ok(ico._cv.hidden === false && ico._ph.hidden === true, "favicon 就绪后同步画到 canvas");
     M.setRowIcon(ico, B, false);
-    ok(ico._cv.hidden === true && ico._ph.hidden === false, "换行时旧 favicon 立即隐藏");
+    ok(ico._cv.hidden === true && ico._ph.hidden === true, "换行时旧 favicon 立即撤掉且不显示占位");
     ok(!!M.favCache.get(favB), "新 favicon 进入后台加载");
     M.setRowIcon(ico, A, false);
     ok(ico._cv.hidden === false && ico._k === favA, "缓存命中的图标同步恢复，不等异步");
@@ -569,10 +568,21 @@ if (M) {
     ok(ico._ph.hidden === false && ico._cv.hidden === true && ico._phKey === "f",
       "文件夹图标不受影响");
     ok(ico._ph.innerHTML.includes("<svg") && !ico._ph.innerHTML.includes("undefined"),
-      "文件夹占位图标渲染正常");
+      "文件夹图标渲染正常");
     M.setStaticIcon(ico, "nav");
     ok(ico._phKey === "nav" && ico._ph.hidden === false, "虚拟根图标走同一图标槽");
-    ok(ico._ph.innerHTML.includes("<svg"), "虚拟根占位图标渲染正常");
+    ok(ico._ph.innerHTML.includes("<svg"), "虚拟根图标渲染正常");
+    const bad = { url: "https://bad.example/page" };
+    const favBad = M.favUrl(bad.url);
+    M.setRowIcon(ico, bad, false);
+    const ebad = M.favCache.get(favBad);
+    ebad.img.onerror();
+    ok(ico._ph.hidden === false && ico._ph.innerHTML.includes("<svg"), "加载失败回落到链接图标");
+    const pre = [{ url: "https://p1.example/page" }, { url: "https://p2.example/page" }];
+    M.prefetchFavicons(pre, 0, pre.length - 1, (r) => r.url);
+    flushRaf();
+    ok(M.favCache.has(M.favUrl(pre[0].url)) && M.favCache.has(M.favUrl(pre[1].url)),
+      "进入列表时整层 favicon 预取进缓存");
   }
 
   console.log("\n— 外观 —");

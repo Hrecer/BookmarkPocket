@@ -52,6 +52,57 @@ export function makeListRow() {
 const FAV_CACHE_MAX = 4096;
 export const favCache = new Map();   // favicon URL -> { img, ready, failed, waiters }
 
+// 进入目录就预取 favicon：小列表一次全排上，大列表按视口前后一段滚动着补。
+// 这样滚到哪儿图标都已经在缓存里，不会在滚动过程中从空白里慢慢长出来。
+const PREFETCH_ALL = 2000;
+const PREFETCH_AHEAD = 400;
+const prefetch = { q: [], set: new Set(), scheduled: false };
+
+function schedulePrefetchPump() {
+  if (prefetch.scheduled) return;
+  prefetch.scheduled = true;
+  const run = () => { prefetch.scheduled = false; pumpPrefetch(); };
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(run);
+  else setTimeout(run, 16);
+}
+
+function pumpPrefetch() {
+  let n = 0;
+  while (prefetch.q.length && n++ < 64) {
+    const url = prefetch.q.shift();
+    prefetch.set.delete(url);
+    if (!favCache.has(url)) getFavEntry(url);
+  }
+  if (prefetch.q.length) schedulePrefetchPump();
+}
+
+function enqueueFav(url) {
+  if (favCache.has(url) || prefetch.set.has(url)) return;
+  prefetch.set.add(url);
+  prefetch.q.push(url);
+  schedulePrefetchPump();
+}
+
+export function prefetchFavicons(rows, first, last, urlOf) {
+  if (!rows || !rows.length) return;
+  let from, to;
+  if (rows.length <= PREFETCH_ALL) {
+    if (rows._prefetched) return;
+    rows._prefetched = true;
+    from = 0; to = rows.length;
+  } else {
+    from = Math.max(0, first - 60);
+    to = Math.min(rows.length, last + 1 + PREFETCH_AHEAD);
+  }
+  for (let i = from; i < to; i++) {
+    const r = rows[i];
+    if (!r) continue;
+    const u = urlOf(r);
+    if (u && /^https?:/i.test(u)) enqueueFav(favUrl(u));
+  }
+  if (rows.length <= PREFETCH_ALL) pumpPrefetch();   // 小列表：首批立刻开跑，不等下一帧
+}
+
 function getFavEntry(url) {
   let e = favCache.get(url);
   if (e) return e;
@@ -117,6 +168,13 @@ function showIconPlaceholder(ico, kind) {
   ico._k = kind;
 }
 
+// 加载 favicon 期间图标位留空：不画任何占位图标，等真图标到了直接出现
+function showIconLoading(ico) {
+  ico._ph.hidden = true;
+  ico._cv.hidden = true;
+  ico._k = "";
+}
+
 function drawFavicon(ico, key, img) {
   dropFavWait(ico);
   const cv = ico._cv;
@@ -149,8 +207,8 @@ export function setRowIcon(ico, n, isFolder) {
   dropFavWait(ico);
   const e = getFavEntry(fav);
   if (e.ready) { drawFavicon(ico, fav, e.img); return; }
-  showIconPlaceholder(ico, "l");
-  if (e.failed) return;
+  if (e.failed) { setStaticIcon(ico, "l"); return; }
+  showIconLoading(ico);
   ico._want = fav;
   ico._favEntry = e;
   e.waiters.add(ico);
@@ -209,6 +267,7 @@ function applyRowWindow(entering) {
   // 行区间没变、数据也没换版 → 不动 DOM（行随原生滚动一起走，行内滑动零开销）
   if (!entering && lPool._first === b.first && lPool._last === b.last && lPool._seenVer === S.listVer) return;
   lPool._first = b.first; lPool._last = b.last; lPool._seenVer = S.listVer;
+  prefetchFavicons(S.viewRows, b.first, b.last, (r) => (r.isFolder ? "" : r.node.url));
   applyWindow(lPool, rowsEl, makeListRow, b, L_ROW_H, S.listVer, (el, idx) => {
     updateListRow(el, S.viewRows[idx], idx);
     if (entering) el.classList.add("enter");

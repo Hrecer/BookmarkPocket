@@ -12,7 +12,7 @@ import { fmtDate } from "./data.js";
 import { ICON, fmt, crowsEl, qcrowsEl, listEl, qListEl, qspacerEl, spacerEl } from "./dom.js";
 import { applyWindow, windowBounds } from "./virtual.js";
 import { hlText } from "./search.js";
-import { setRowIcon } from "./list.js";
+import { prefetchFavicons, setRowIcon } from "./list.js";
 
 const MIN_CARD_W = 240;   // 单卡最小宽度：窄到这个值就少排一列
 const MAX_COLS = 3;       // 参考项目：一行三个。再密下去卡片就小得没法用了
@@ -238,6 +238,11 @@ function applyCardPane(pane, entering) {
   const ver = boxVer(pane);
   if (!entering && box._first === b.first && box._last === b.last && box._ver === ver) return;
   box._first = b.first; box._last = b.last; box._ver = ver;
+  const rows = paneRows(pane);
+  const urlOf = pane === "search"
+    ? (r) => (r.row.isFolder ? "" : r.row.url)
+    : (r) => (r.isFolder ? "" : r.node.url);
+  prefetchFavicons(rows, b.first * c, Math.min(rows.length, (b.last + 1) * c) - 1, urlOf);
   applyWindow(box.pool, box.container, makeCardRow, b, rowH, ver, (el, vIdx) => updateCardRow(el, vIdx, pane, entering));
 }
 
