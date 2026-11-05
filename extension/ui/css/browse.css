@@ -99,7 +99,7 @@
 
 .tico { width: 16px; height: 16px; flex: none; display: grid; place-items: center; color: var(--fg-dim); }
 .tico svg { width: 15px; height: 15px; }
-.tico img { width: 15px; height: 15px; border-radius: 4px; }
+.tico canvas { width: 15px; height: 15px; border-radius: 4px; }
 /* 不再省略号截断：名字有多长就多长，超出的部分靠底部横向滚动条去看 */
 .tname { font-size: 13px; flex: none; }
 .tnode.folder .tname { font-weight: 500; }
@@ -159,7 +159,7 @@ button.col:hover { color: var(--fg); }
 .cell-name .ico { width: 20px; height: 20px; flex: none; display: grid; place-items: center; color: var(--fg-dim); }
 .ico-ph { display: grid; place-items: center; }
 .cell-name .ico svg { width: 17px; height: 17px; }
-.cell-name .ico img { width: 16px; height: 16px; border-radius: 4px; }
+.cell-name .ico canvas { width: 16px; height: 16px; border-radius: 4px; }
 .cell-name .nm { font-size: 14px; margin-left: 10px; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .row.folder .cell-name .nm { font-weight: 500; }
 .cell-name .chip {

@@ -21,26 +21,10 @@ import { copyPath, ensureListVisible, ensureTreeVisible, expandToCurrent, initSp
 import { applyTheme, cycleTheme, pollBridge, readThemeMode, refreshCfgStatus, stopHub } from "./shell.js";
 import { wireRulesView } from "./rulesview.js";
 
-// 单帧位移超过约一屏 → 判为「超大幅滚动」：这期间先不加载 favicon（图片解码是最大头），
-// 停稳 140ms 后再整窗重绘一次补上。100K 量级下，这是拖动滚动条时不掉帧的关键。
-const FAST_JUMP = 900;
-function noteScroll(sc) {
-  const prev = sc._mark || 0;
-  sc._mark = sc.scrollTop;
-  if (Math.abs(sc.scrollTop - prev) > FAST_JUMP) S.fastScroll = true;
-  clearTimeout(S.fastScrollT);
-  S.fastScrollT = setTimeout(() => {
-    if (!S.fastScroll) return;
-    S.fastScroll = false;
-    if (S.viewMode === "browse") { S.listVer++; applyListWindow(false); }
-    else if (S.viewMode === "search") { S.qVer++; applySearchWindow(false); }
-  }, 140);
-}
-
 export function wire() {
   treeEl.addEventListener("scroll", () => onScrollFrame(treeEl, applyTreeWindow), { passive: true });
 
-  listEl.addEventListener("scroll", () => { noteScroll(listEl); onScrollFrame(listEl, applyListWindow); }, { passive: true });
+  listEl.addEventListener("scroll", () => onScrollFrame(listEl, applyListWindow), { passive: true });
 
   if (typeof ResizeObserver !== "undefined") {
     const ro = new ResizeObserver(() => onScrollFrame(ro, applyAllWindows));
@@ -89,7 +73,7 @@ export function wire() {
     });
   });
 
-  qListEl.addEventListener("scroll", () => { noteScroll(qListEl); onScrollFrame(qListEl, applySearchWindow); }, { passive: true });
+  qListEl.addEventListener("scroll", () => onScrollFrame(qListEl, applySearchWindow), { passive: true });
 
   document.addEventListener("pointermove", (e) => {
     if (dragState.active) {

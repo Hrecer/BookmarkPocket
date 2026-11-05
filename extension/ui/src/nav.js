@@ -48,7 +48,6 @@ export async function navigate(id, { push = true, selectExitedChild = false } = 
     if (cameFrom) S.sel = new Set([cameFrom]);
     // 滚动位置也按目录归零：否则在子文件夹里滚到底，回到父文件夹还停在底部。
     listEl.scrollTop = 0;
-    listEl._mark = 0;   // 同步滚动标记，免得被判成「用户超大幅滚动」而短暂停掉图标
     expandTo(id);
     await refresh({ busy: false, entering: true, counts: true });
     if (cameFrom) {

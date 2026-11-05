@@ -43,28 +43,69 @@ export function makeListRow() {
   return el;
 }
 
-// 行图标：图标槽固定为「占位图标 + 常驻 <img>」两个节点。
-// 必须复用同一个 <img>，只换 src —— 重建 <img> 会让浏览器对同一张 favicon
-// 重新走一次加载 + 解码，滚动时每帧重建几十个就是「图标列发白 + 掉帧」的主因。
-// 换图时先把占位图标露出来：复用行绝不能继续画着上一个链接的 favicon，
-// 等新 favicon 就绪后再切到 <img>。
+// 行图标：图标槽 =「占位图标 + <canvas>」。
+// favicon 必须拿到已解码的位图才能同步画出来；<img> 换 src 时旧位图会一直
+// 画到新图解码完成，复用行就会短暂显示上一行的图标。这里把 favicon 按 URL
+// 缓存成已加载的 Image，再用 canvas 同步绘制：命中缓存时本次渲染就是真图标，
+// 不经过占位；未命中才先露占位并等加载。缓存条目独立于行元素 —— 行被回收、
+// 继续滚动都不会取消加载，滚回来时图标已经就绪。
+const FAV_CACHE_MAX = 4096;
+export const favCache = new Map();   // favicon URL -> { img, ready, failed, waiters }
+
+function getFavEntry(url) {
+  let e = favCache.get(url);
+  if (e) return e;
+  const img = document.createElement("img");
+  e = { img, ready: false, failed: false, waiters: new Set() };
+  img.onload = () => {
+    e.ready = true;
+    const hosts = [...e.waiters];
+    e.waiters.clear();
+    for (const host of hosts) {
+      if (host._favEntry === e && host._want === url) drawFavicon(host, url, img);
+    }
+  };
+  img.onerror = () => {
+    e.failed = true;
+    const hosts = [...e.waiters];
+    e.waiters.clear();
+    for (const host of hosts) {
+      if (host._favEntry === e && host._want === url) setStaticIcon(host, "l");
+    }
+  };
+  img.src = url;
+  favCache.set(url, e);
+  if (favCache.size > FAV_CACHE_MAX) {
+    for (const [k, v] of favCache) {
+      if (!v.waiters.size) { favCache.delete(k); break; }
+    }
+  }
+  return e;
+}
+
 function ensureIconSlot(ico) {
   const ph = document.createElement("span");
   ph.className = "ico-ph";
-  const img = document.createElement("img");
-  img.alt = "";
-  img.decoding = "async";
-  img.hidden = true;
-  ico.replaceChildren(ph, img);
+  const cv = document.createElement("canvas");
+  cv.width = 32;
+  cv.height = 32;
+  cv.hidden = true;
+  ico.replaceChildren(ph, cv);
   ico._ph = ph;
-  ico._img = img;
+  ico._cv = cv;
+  ico._ctx = null;
   ico._phKey = "";
   ico._k = "";
   ico._want = null;
-  ico._tok = 0;
+  ico._favEntry = null;
 }
 
 const PLACEHOLDER_ICON = { f: ICON.folder, l: ICON.link, nav: ICON.nav };
+
+function dropFavWait(ico) {
+  if (ico._favEntry) { ico._favEntry.waiters.delete(ico); ico._favEntry = null; }
+  ico._want = null;
+}
 
 function showIconPlaceholder(ico, kind) {
   if (ico._phKey !== kind) {
@@ -72,22 +113,29 @@ function showIconPlaceholder(ico, kind) {
     ico._phKey = kind;
   }
   ico._ph.hidden = false;
-  ico._img.hidden = true;
+  ico._cv.hidden = true;
   ico._k = kind;
 }
 
-function showIconImage(ico, key) {
-  ico._want = null;
-  ico._k = key;
+function drawFavicon(ico, key, img) {
+  dropFavWait(ico);
+  const cv = ico._cv;
+  if (!ico._ctx) {
+    try { ico._ctx = cv.getContext("2d"); } catch (e) { ico._ctx = null; }
+  }
+  const ctx = ico._ctx;
+  if (!ctx) { showIconPlaceholder(ico, "l"); return; }
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(img, 0, 0, cv.width, cv.height);
   ico._ph.hidden = true;
-  ico._img.hidden = false;
+  cv.hidden = false;
+  ico._k = key;
 }
 
 export function setStaticIcon(ico, kind) {
   if (!ico._ph) ensureIconSlot(ico);
-  if (ico._k === kind && !ico._want) return;
-  ico._tok = (ico._tok | 0) + 1;
-  ico._want = null;
+  dropFavWait(ico);
+  if (ico._k === kind) return;
   showIconPlaceholder(ico, kind);
 }
 
@@ -95,38 +143,17 @@ export function setRowIcon(ico, n, isFolder) {
   if (!ico._ph) ensureIconSlot(ico);
   if (isFolder) { setStaticIcon(ico, "f"); return; }
   const fav = n.url && /^https?:/i.test(n.url) ? favUrl(n.url) : "";
-  const key = fav || "l";
-  if (ico._k === key && !ico._want) return;
-  if (S.fastScroll) {
-    // 超大幅滚动中：不加载 favicon（解码是大头），但必须立刻撤掉复用行上一行的图标
-    if (ico._k !== "l" || ico._want) {
-      ico._tok = (ico._tok | 0) + 1;
-      ico._want = null;
-      showIconPlaceholder(ico, "l");
-    }
-    return;
-  }
-  if (ico._want === key) return;   // 同一个 favicon 正在加载：先让占位图标顶着
-  ico._tok = (ico._tok | 0) + 1;
-  ico._want = null;
+  if (!fav) { setStaticIcon(ico, "l"); return; }
+  if (ico._k === fav) return;                     // 当前画的就是这张
+  if (ico._want === fav && ico._favEntry) return; // 同一张正在加载
+  dropFavWait(ico);
+  const e = getFavEntry(fav);
+  if (e.ready) { drawFavicon(ico, fav, e.img); return; }
   showIconPlaceholder(ico, "l");
-  if (!fav) return;
-  const token = ico._tok;
-  const img = ico._img;
-  ico._want = key;
-  img.onload = () => { if (ico._tok === token) showIconImage(ico, key); };
-  img.onerror = () => {
-    if (ico._tok !== token) return;
-    ico._want = null;
-    ico._k = "l";
-    ico._ph.hidden = false;
-    ico._img.hidden = true;
-  };
-  if (img.getAttribute("src") === fav) {
-    if (img.complete && img.naturalWidth) { showIconImage(ico, key); return; }
-    if (img.complete) img.removeAttribute("src");   // 上一次加载失败：清掉后重试
-  }
-  img.src = fav;
+  if (e.failed) return;
+  ico._want = fav;
+  ico._favEntry = e;
+  e.waiters.add(ico);
 }
 
 export function updateListRow(el, r, idx) {

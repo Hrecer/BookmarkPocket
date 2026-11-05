@@ -71,7 +71,4 @@ export const S = {
   // 交互临时态：删除确认按钮、框选、卡片行内编辑
   delArm: null,
   mq: null,
-  // 快速大幅滚动：此时跳过 favicon 加载（图片解码是大头），停下来后再补
-  fastScroll: false,
-  fastScrollT: 0,
 };

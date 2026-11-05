@@ -76,6 +76,7 @@ function mkEl(tag = "div") {
   el.querySelectorAll = (sel) => findIn(el, sel, false);
   el.getBoundingClientRect = () => ({ top: 0, left: 0, right: 100, bottom: 30, width: 100, height: 30 });
   el.focus = () => {}; el.select = () => {}; el.blur = () => {}; el.scrollIntoView = () => {};
+  if (String(tag).toLowerCase() === "canvas") el.getContext = () => ({ clearRect() {}, drawImage() {} });
   el.insertAdjacentHTML = (_, h) => parseHTML(h, el);
   Object.defineProperty(el, "textContent", {
     get: () => (el._children.length ? el._children.map((c) => c.textContent).join("") : el._text),
@@ -536,29 +537,36 @@ if (M) {
     const ico = document.createElement("span");
     const A = { url: "https://a.example/page" };
     const B = { url: "https://b.example/page" };
+    const favA = M.favUrl(A.url);
+    const favB = M.favUrl(B.url);
     M.setRowIcon(ico, A, false);
-    ok(ico._ph.hidden === false && ico._img.hidden === true, "新图标先显示占位，不透出上一行");
+    ok(ico._ph.hidden === false && ico._cv.hidden === true, "新图标先显示占位，不透出上一行");
     ok(ico._ph.innerHTML.includes("<svg"), "占位图标是真实 SVG，不是 undefined 文本");
-    ok(ico._img.src.includes(encodeURIComponent(A.url)), "占位期间已开始加载 favicon");
-    ico._img.onload();
-    ok(ico._img.hidden === false && ico._ph.hidden === true, "favicon 就绪后切到图片");
-    const srcA = ico._img.src;
+    const ea = M.favCache.get(favA);
+    ok(!!ea && ea.img.src === favA, "favicon 进入后台加载缓存");
+    ea.img.onload();
+    ok(ico._cv.hidden === false && ico._ph.hidden === true, "favicon 就绪后同步画到 canvas");
     M.setRowIcon(ico, B, false);
-    ok(ico._img.hidden === true && ico._ph.hidden === false, "换行时旧 favicon 立即隐藏");
-    ok(ico._img.src !== srcA, "开始加载新 favicon");
-    ico._img.onload();
-    ok(ico._img.hidden === false, "新 favicon 就绪后显示");
-    M.S.fastScroll = true;
-    M.setRowIcon(ico, { url: "https://c.example/page" }, false);
-    ok(ico._img.hidden === true && ico._ph.hidden === false && ico._k === "l",
-      "快速滚动中不保留旧图标，也不加载新图");
-    M.S.fastScroll = false;
-    M.setRowIcon(ico, { url: "https://c.example/page" }, false);
-    ok(ico._ph.hidden === false && ico._k === "l", "停滚后重新进入加载态");
-    ico._img.onload();
-    ok(ico._img.hidden === false, "停滚后的 favicon 正常显示");
+    ok(ico._cv.hidden === true && ico._ph.hidden === false, "换行时旧 favicon 立即隐藏");
+    ok(!!M.favCache.get(favB), "新 favicon 进入后台加载");
+    M.setRowIcon(ico, A, false);
+    ok(ico._cv.hidden === false && ico._k === favA, "缓存命中的图标同步恢复，不等异步");
+    const C = { url: "https://c.example/page" };
+    M.setRowIcon(ico, C, false);
+    const ec = M.favCache.get(M.favUrl(C.url));
+    ok(!!ec, "换行后的 favicon 照常加载（不再跳过）");
+    ec.img.onload();
+    ok(ico._cv.hidden === false, "加载完成后显示真图标");
+    const D = { url: "https://d.example/page" };
+    M.setRowIcon(ico, D, false);
+    const ed = M.favCache.get(M.favUrl(D.url));
+    M.setRowIcon(ico, B, false);   // 行被回收去画 B
+    ed.img.onload();               // D 的加载在后台继续
+    ok(ed.ready === true, "行被回收不会取消原图标的加载");
+    M.setRowIcon(ico, D, false);
+    ok(ico._cv.hidden === false && ico._k === M.favUrl(D.url), "滚回来直接显示已加载的图标");
     M.setRowIcon(ico, { url: "" }, true);
-    ok(ico._ph.hidden === false && ico._img.hidden === true && ico._phKey === "f",
+    ok(ico._ph.hidden === false && ico._cv.hidden === true && ico._phKey === "f",
       "文件夹图标不受影响");
     ok(ico._ph.innerHTML.includes("<svg") && !ico._ph.innerHTML.includes("undefined"),
       "文件夹占位图标渲染正常");
