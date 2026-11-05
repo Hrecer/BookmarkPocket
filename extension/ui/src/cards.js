@@ -36,6 +36,7 @@ function metrics() {
 }
 
 export function cardRowHeight() { const m = metrics(); return m.h + m.gap; }
+export function cardItemHeight() { return metrics().h; }
 
 /** 面板当前是否卡片布局（浏览 / 搜索各自独立） */
 export function cardOn(pane) { return pane === "search" ? S.searchCard : S.browseCard; }

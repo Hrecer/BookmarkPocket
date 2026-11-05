@@ -11,13 +11,14 @@
 import { S, clearRenamePair } from "./state.js";
 import { K } from "../../src/keys.js";
 import { $, ICON, fmt, listEl, qListEl } from "./dom.js";
-import { itemAt, paneBox, paneRows, paintCard, findCardEl, cardOn, colsOf } from "./cards.js";
+import { itemAt, paneBox, paneRows, paintCard, findCardEl, cardOn } from "./cards.js";
+import { anchorScrollTop, centerAnchor } from "./anchor.js";
 import { op, setStatus, toast } from "./chan.js";
 import { openNode } from "./details.js";
 import { refresh, updateStatusCounts } from "./nav.js";
 import { doUndo } from "./crud.js";
 import { showCtxMenu, rowMenuItems, startDragCandidate } from "./transfer.js";
-import { applyListWindow, itemHeight, itemOffsetTop, renderList, syncSelection } from "./list.js";
+import { applyListWindow, renderList, syncSelection } from "./list.js";
 import { openSearchNode, renderSearch, applySearchWindow } from "./search.js";
 
 const MARQ_MIN = 8;   // 空白拖拽超过这个位移才算框选（否则当作普通点击）
@@ -352,24 +353,15 @@ export function syncCardMode() {
   updateViewToggle();
 }
 
-/* ---------------- 切换布局时保住「当前位置」 ---------------- */
-// 两种布局共用同一份项序，只是行距/列数不同。锚点**固定取视口顶部那一项**：
-// 之前「有选中就跳到选中项、否则取顶部」会导致同样的操作时而跳这里时而跳那里，
-// 现在只认顶部那一项 —— 切换前后看到的东西不变，行为可预期。
+/* ---------------- 切换布局时保住「视线中心」 ---------------- */
+// 两种布局共用同一份项序，只是行距/列数不同。锚点取视口正中间那一项
+// （卡片取中间列），切完把这一项的中心放回视口正中间；顶部/底部保持贴边。
+// 之前取「视口顶部第一项」再对到顶部：卡片有上下留白、几列并排，
+// 切换后经常上下错位，看不出原来在看哪里。
 
-function scrollerOf(pane) { return pane === "search" ? qListEl : listEl; }
-
-function keepIndex(pane) {
-  const rows = paneRows(pane); if (!rows.length) return 0;
-  const h = itemHeight(pane); if (!h) return 0;   // 切换前的旧行距
-  const per = cardOn(pane) ? colsOf(pane) : 1;
-  const top = Math.floor(scrollerOf(pane).scrollTop / h) * per;
-  return Math.min(rows.length - 1, Math.max(0, top));
-}
-
-function restoreIndex(pane, i) {
-  if (i < 0) return;
-  scrollerOf(pane).scrollTop = Math.max(0, itemOffsetTop(i, pane));   // 用切换后的新行距
+function restoreAnchor(pane, anchor) {
+  if (!anchor || anchor.i < 0) return;
+  (pane === "search" ? qListEl : listEl).scrollTop = anchorScrollTop(pane, anchor);
   if (pane === "search") applySearchWindow(false); else applyListWindow(false);
 }
 
@@ -377,7 +369,7 @@ function restoreIndex(pane, i) {
 export function setCardMode(on, persist = true, rerender = true) {
   clearRenamePair();   // 切换视图形态也是另一种手势
   const pane = S.viewMode === "search" ? "search" : "browse";
-  const keep = rerender ? keepIndex(pane) : -1;
+  const keep = rerender ? centerAnchor(pane) : null;
   if (S.editingId) cancelCardEdit();   // 正在改的那张卡先退出，否则列表层不会重铺
   if (pane === "search") S.searchCard = !!on; else S.browseCard = !!on;
   if (persist) saveCardPref();
@@ -386,7 +378,7 @@ export function setCardMode(on, persist = true, rerender = true) {
     if (S.viewMode === "browse") { S.listVer++; renderList(false); updateStatusCounts(); }
     else if (S.viewMode === "search") renderSearch(false);
     else applySearchWindow(false);
-    restoreIndex(pane, keep);
+    restoreAnchor(pane, keep);
   }
   moveViewInd();
 }

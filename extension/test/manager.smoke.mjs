@@ -526,6 +526,43 @@ if (M) {
   M.switchView("browse");
   flushRaf();
 
+  console.log("\n— 视图切换锚点 —");
+  {
+    const savedRows = M.S.viewRows;
+    const savedCard = M.S.browseCard;
+    const savedCols = M.S.cardCols;
+    const savedTop = $id("list").scrollTop;
+    const savedH = $id("list").scrollHeight;
+    M.S.viewRows = Array.from({ length: 100 }, (_, i) => ({ node: { id: "t" + i, title: "T" + i, url: "https://e" + i + ".example/page" }, isFolder: false }));
+    M.S.browseCard = false;
+    $id("list").scrollHeight = 5000;
+    $id("list").scrollTop = 1440;   // 600px 视口，36px 行高：正中间是第 48 项
+    const a = M.centerAnchor("browse");
+    ok(a.i === 48 && a.edge === null, "列表取视口正中间那一项（" + a.i + "）");
+    M.S.browseCard = true;
+    M.S.cardCols = 3;
+    ok(M.anchorScrollTop("browse", a) === 2234, "切到卡片后该项仍落在视口正中间",
+      String(M.anchorScrollTop("browse", a)));
+    $id("list").scrollTop = 2234;
+    const b = M.centerAnchor("browse");
+    ok(b.i === 49 && b.edge === null, "卡片取中间列的卡片（" + b.i + "）");
+    M.S.browseCard = false;
+    ok(M.anchorScrollTop("browse", b) === 1482, "切回列表后该项仍居中",
+      String(M.anchorScrollTop("browse", b)));
+    $id("list").scrollTop = 0;
+    M.S.browseCard = false;
+    ok(M.centerAnchor("browse").edge === "top", "顶部保持贴顶");
+    $id("list").scrollTop = 4400;
+    ok(M.centerAnchor("browse").edge === "bottom", "底部保持贴底");
+    M.S.browseCard = true;
+    ok(M.anchorScrollTop("browse", { i: 99, edge: "bottom" }) === 4400, "贴底锚点换算到新的最大滚动");
+    M.S.viewRows = savedRows;
+    M.S.browseCard = savedCard;
+    M.S.cardCols = savedCols;
+    $id("list").scrollTop = savedTop;
+    $id("list").scrollHeight = savedH;
+  }
+
   console.log("\n— 排序 / 数据层 —");
   ok(typeof M.sortCmp === "function" && typeof M.folderRows === "function", "数据层函数可用");
   ok(M.folderRows("1").length === 3, "folderRows('1') 取到该层全部 3 项", String(M.folderRows("1").length));

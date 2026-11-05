@@ -2,6 +2,7 @@
 // 页面本身不 import 它。
 
 export { S } from "./state.js";
+export { anchorScrollTop, centerAnchor } from "./anchor.js";
 export { op, setStatus, toast } from "./chan.js";
 export { askDelete, askDeleteFromPane, doDeleteConfirmed, doUndo } from "./crud.js";
 export { childrenOf, favUrl, flattenAll, fmtDate, folderRows, indexTree, pathOf, sortCmp } from "./data.js";

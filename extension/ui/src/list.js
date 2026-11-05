@@ -9,7 +9,7 @@ import { applySearchWindow } from "./search.js";
 import { rowMenuItems, showCtxMenu, startDragCandidate } from "./transfer.js";
 import { applyTreeWindow } from "./tree.js";
 import { applyWindow, windowBounds } from "./virtual.js";
-import { applyCardWindow, cardItemTop, cardOn, cardRowHeight, colsOf, syncCardSelection } from "./cards.js";
+import { applyCardWindow, cardItemHeight, cardItemTop, cardOn, cardRowHeight, colsOf, syncCardSelection } from "./cards.js";
 
 export function makeListRow() {
   const el = document.createElement("div");
@@ -278,6 +278,7 @@ function applyRowWindow(entering) {
 // nav / shortcuts / boot 的方向键与「滚入视口」都走这两个，免得各处再各写一份 L_ROW_H。
 export function itemHeight(pane = "browse") { return cardOn(pane) ? cardRowHeight() : L_ROW_H; }
 export function itemOffsetTop(i, pane = "browse") { return cardOn(pane) ? cardItemTop(i, colsOf(pane)) : i * L_ROW_H; }
+export function itemVisualHeight(pane = "browse") { return cardOn(pane) ? cardItemHeight() : L_ROW_H; }
 
 // 容器尺寸变了就重铺窗口（只挪窗口，不重算数据）。会走到这里的场景：
 // 窗口缩放、拖分隔条、侧栏出现横向滚动条（横向滚动条会吃掉 16px 可视高度，
