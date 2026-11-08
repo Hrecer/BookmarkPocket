@@ -18,6 +18,17 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const CONFIG_PATH = process.env.BOOKMARKPOCKET_CONFIG || path.join(HERE, "..", "config.json");
 export const SERVER_VERSION = "0.1.0";
 
+const CALL_TIMEOUT_MS = 20000;
+const BULK_TIMEOUT_MS = 120000;          // 首块可能较慢，先给 2 分钟
+const BULK_IDLE_MS = 60000;              // 有进度就续期；60 秒没进度才判失败
+const RELAY_BULK_TIMEOUT_MS = 10 * 60 * 1000;
+const BULK_OPS = new Set([
+  "bookmark.moveMany", "bookmark.createMany", "bookmark.copy",
+  "bookmark.remove", "bookmark.undoLast", "rules.apply",
+]);
+const timeoutFor = (op) => (BULK_OPS.has(op) ? BULK_TIMEOUT_MS : CALL_TIMEOUT_MS);
+const relayTimeoutFor = (op) => (BULK_OPS.has(op) ? RELAY_BULK_TIMEOUT_MS : CALL_TIMEOUT_MS);
+
 export function loadConfig() {
   let cfg = {};
   try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8")); } catch (e) { /* 首次生成 */ }
@@ -52,6 +63,7 @@ export function startHub({ cfg, log = () => {}, onShutdown = null } = {}) {
   const controlClients = new Set();
   let controlWss = null;
   let closing = false;
+  let lastBulk = null;
 
   /* ---------- 自身进程信息：扩展的管理页要看见这个后台进程 ---------- */
 
@@ -72,9 +84,17 @@ export function startHub({ cfg, log = () => {}, onShutdown = null } = {}) {
   }
 
   const heartbeat = setInterval(() => {
-    if (active && active.readyState === 1) {
-      try { active.send(JSON.stringify({ type: "hubStatus", ...stats() })); } catch (e) { /* ignore */ }
+    if (!(active && active.readyState === 1)) return;
+    // 双向心跳：扩展 30 秒没有 pong，就认定连接已经僵死，主动断开让扩展重连。
+    if (Date.now() - (active._lastPong || 0) > 30000) {
+      log("扩展心跳超时，断开旧连接等待重连");
+      try { active.terminate(); } catch (e) { /* ignore */ }
+      return;
     }
+    try {
+      active.send(JSON.stringify({ type: "hubStatus", ...stats() }));
+      active.send(JSON.stringify({ type: "ping" }));
+    } catch (e) { /* ignore */ }
   }, 5000);
   if (heartbeat.unref) heartbeat.unref();              // 别让心跳拖住进程退出
 
@@ -107,6 +127,7 @@ export function startHub({ cfg, log = () => {}, onShutdown = null } = {}) {
     if (cfg.allowedOrigins.length && !origin) log("注意：连接未带 Origin 头（凭令牌放行）");
 
     let authed = false;
+    ws._lastPong = Date.now();
     ws.on("message", (buf) => {
       let m;
       try { m = JSON.parse(String(buf)); } catch (e) { return; }
@@ -128,6 +149,16 @@ export function startHub({ cfg, log = () => {}, onShutdown = null } = {}) {
       }
 
       if (!authed) return;
+
+      if (m.type === "bulkProgress") {
+        lastBulk = { ...m, at: Date.now() };
+        const p = pending.get(m.id);
+        if (p && p.refresh) p.refresh();
+        for (const cc of controlClients) {
+          try { cc.send(JSON.stringify(m)); } catch (e) { /* ignore */ }
+        }
+        return;
+      }
 
       if (m.type === "result") {
         const p = pending.get(m.id);
@@ -153,7 +184,7 @@ export function startHub({ cfg, log = () => {}, onShutdown = null } = {}) {
         if (onShutdown) setTimeout(onShutdown, 80);
         return;
       }
-      if (m.type === "pong") return;
+      if (m.type === "pong") { ws._lastPong = Date.now(); return; }
     });
 
     ws.on("close", () => {
@@ -220,6 +251,13 @@ export function startHub({ cfg, log = () => {}, onShutdown = null } = {}) {
           for (const w of ws) w.resolve(relay);
           return;
         }
+        if (m.type === "bulkProgress") {
+          lastBulk = { ...m, at: Date.now() };
+          for (const cc of controlClients) {
+            try { cc.send(JSON.stringify(m)); } catch (e) { /* ignore */ }
+          }
+          return;
+        }
         if (m.type === "result") {
           const p = relayPending.get(m.id);
           if (!p) return;
@@ -241,7 +279,7 @@ export function startHub({ cfg, log = () => {}, onShutdown = null } = {}) {
     const r = await ensureRelay();
     const id = "r" + (++relaySeq);
     return await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { relayPending.delete(id); reject(new Error("等待常驻中枢响应超时: " + op)); }, 20000);
+      const timer = setTimeout(() => { relayPending.delete(id); reject(new Error("等待常驻中枢响应超时: " + op)); }, relayTimeoutFor(op));
       relayPending.set(id, { resolve, reject, timer });
       try { r.send(JSON.stringify({ type: "call", id, op, args: args || {} })); }
       catch (e) { relayPending.delete(id); clearTimeout(timer); reject(e); }
@@ -258,6 +296,7 @@ export function startHub({ cfg, log = () => {}, onShutdown = null } = {}) {
   }
 
   async function callExtension(op, args) {
+    if (op === "sys.hub.status") return status();
     if (mode === "secondary") return await relayCall(op, args);
     if (!(await waitForExt())) {
       throw new Error(
@@ -267,10 +306,19 @@ export function startHub({ cfg, log = () => {}, onShutdown = null } = {}) {
     }
     const id = `c${++msgSeq}`;
     return await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { pending.delete(id); reject(new Error("等待扩展响应超时: " + op)); }, 20000);
-      pending.set(id, { resolve, reject, timer });
+      const entry = { resolve, reject, timer: null, refresh: null };
+      const arm = (ms) => {
+        if (entry.timer) clearTimeout(entry.timer);
+        entry.timer = setTimeout(() => {
+          pending.delete(id);
+          reject(new Error("等待扩展响应超时: " + op));
+        }, ms);
+      };
+      entry.refresh = () => arm(BULK_IDLE_MS);
+      pending.set(id, entry);
+      arm(timeoutFor(op));
       try { active.send(JSON.stringify({ type: "call", id, op, args: args || {} })); }
-      catch (e) { pending.delete(id); clearTimeout(timer); reject(e); }
+      catch (e) { pending.delete(id); if (entry.timer) clearTimeout(entry.timer); reject(e); }
     });
   }
 
@@ -283,6 +331,7 @@ export function startHub({ cfg, log = () => {}, onShutdown = null } = {}) {
       extensionConnected: !!(active && active.readyState === 1),
       startedAt,
       version: SERVER_VERSION,
+      lastBulk,
       ...stats(),
       events: events.slice(-20),
     };

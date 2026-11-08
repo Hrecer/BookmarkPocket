@@ -68,7 +68,9 @@ Register the MCP server with your host:
 }
 ```
 
-The assistant gets 15 tools: read the tree, search, create, rename, move, bulk move, bulk create, delete, undo, check the connection, and read/write/apply the routing rules.
+The assistant gets 16 tools: read the tree, search, create, rename, move, bulk move, bulk create, delete, undo, check the connection, query bulk progress, and read/write/apply the routing rules.
+
+Long bulk operations stream progress through `bulk_status`; the hub keeps the call alive while progress keeps arriving, and status/reconnect requests are not blocked behind a running batch.
 
 The local hub listens on `127.0.0.1` only, guarded by a token and an origin allowlist.
 
@@ -78,6 +80,7 @@ Run from the repository root:
 
 ```
 node extension/test/ops.smoke.mjs       # operation semantics
+node extension/test/bulk.smoke.mjs      # bulk progress, self-write isolation, control lane
 node extension/test/bridge.smoke.mjs    # connection handling
 node extension/test/keys.smoke.mjs      # storage keys and first-paint theming
 node extension/test/rules.smoke.mjs     # routing rules, matching and auto-filing

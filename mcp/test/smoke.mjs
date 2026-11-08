@@ -59,6 +59,7 @@ ext.on("message", (buf) => {
     if (m.op === "sys.bridge.status") data = { connected: true, mock: true, url: `ws://127.0.0.1:${PORT}/` };
     else if (m.op === "bookmark.tree") data = { tree: [{ id: "0", children: [{ id: "1", title: "收藏夹栏", path: "收藏夹栏", children: [] }] }], cached: false };
     else if (m.op === "bookmark.move") data = { moved: m.args.id, summary: "移动：x", undo: { kind: "move", id: m.args.id, before: { parentId: "1", index: 3 } } };
+    else if (m.op === "sys.bulk.status") data = { status: "running", active: true, done: 1, total: 2, op: "bookmark.moveMany" };
     else data = { echo: { op: m.op, args: m.args } };
     ext.send(JSON.stringify({ type: "result", id: m.id, ok: true, data }));
   }
@@ -70,11 +71,12 @@ ok("welcome 自带中枢信息（version/pid）", !!welcome && welcome.version =
 
 const tools = await client.listTools();
 const names = tools.tools.map((t) => t.name);
-ok("tools/list 返回 15 个工具", names.length === 15, names.join(", "));
+ok("tools/list 返回 16 个工具", names.length === 16, names.join(", "));
 ok("包含规则工具 rules_get / rules_set / rules_apply", names.includes("rules_get") && names.includes("rules_set") && names.includes("rules_apply"));
 ok("包含 bookmark_remove / bookmark_undo_last", names.includes("bookmark_remove") && names.includes("bookmark_undo_last"));
 ok("包含批量工具 bookmark_move_many / bookmark_create_many",
    names.includes("bookmark_move_many") && names.includes("bookmark_create_many"));
+ok("包含批量进度工具 bulk_status", names.includes("bulk_status"));
 
 const pairRes = await fetch(`http://127.0.0.1:${PORT + 1}/pair.json`).catch(() => null);
 const pairData = pairRes && pairRes.ok ? await pairRes.json() : null;
@@ -94,6 +96,10 @@ ok("树数据回传", r3.content[0].text.includes("收藏夹栏"));
 const r3b = await client.callTool({ name: "rules_set", arguments: { config: { enabled: true, list: [] } } });
 const t3b = JSON.parse(r3b.content[0].text);
 ok("rules_set 参数透传到扩展", t3b.echo && t3b.echo.op === "rules.set" && t3b.echo.args.config.enabled === true);
+
+const rb = await client.callTool({ name: "bulk_status", arguments: {} });
+const tb = JSON.parse(rb.content[0].text);
+ok("bulk_status 全链路返回批量进度", tb.status === "running" && tb.total === 2 && tb.active === true, rb.content[0].text);
 
 // 大幅批量操作回带的 undo 明细必须被剥掉（否则响应会被撑爆），只留 undoable 提示
 const r3c = await client.callTool({ name: "bookmark_move", arguments: { id: "42", parentId: "1" } });

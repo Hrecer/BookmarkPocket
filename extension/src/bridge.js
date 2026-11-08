@@ -1,7 +1,7 @@
 // 桥客户端：连接本机 WS 中枢（mcp 侧），把 Agent 调用转成与 UI 完全相同的 ops.execute。
 // reconnect() 会等待握手结果（收到 welcome 或明确失败，最长 2.5s）再返回状态，避免"点击瞬间还没连完"的误报。
 
-import { execute } from "./ops.js";
+import { execute, isBulkActive } from "./ops.js";
 import { K } from "./keys.js";
 
 let ws = null;
@@ -98,7 +98,11 @@ export async function connect() {
     }
     if (m.type === "call") {
       try {
-        const data = await execute(m.op, m.args);
+        const data = await execute(m.op, m.args, {
+          onProgress: (p) => {
+            try { sock.send(JSON.stringify({ type: "bulkProgress", id: m.id, op: m.op, ...p })); } catch (e) { /* ignore */ }
+          },
+        });
         sock.send(JSON.stringify({ type: "result", id: m.id, ok: true, data }));
       } catch (e) {
         try { sock.send(JSON.stringify({ type: "result", id: m.id, ok: false, error: String((e && e.message) || e) })); } catch (e2) { /* ignore */ }
@@ -139,6 +143,11 @@ export async function pair() {
 }
 
 export async function reconnect() {
+  // 批量操作期间不主动掐断当前连接：关掉 socket 会让正在跑的结果无处可回，
+  // 批量结束后再重连即可。状态/进度查询走控制通道，不会被批量队列堵住。
+  if (isBulkActive() && state.connected) {
+    return { ...getState(), lastError: "批量操作进行中：已跳过强制重连" };
+  }
   try { ws && ws.close(); } catch (e) { /* ignore */ }
   ws = null;
   retryDelay = 1000;

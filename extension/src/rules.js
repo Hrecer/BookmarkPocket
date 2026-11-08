@@ -6,7 +6,7 @@
 // 匹配是纯函数，存储读写也在这一层；不碰 DOM，写操作一律走 ops（可撤销、有日志）。
 
 import { K } from "./keys.js";
-import { execute, isSelfWrite, note, ensureTree, markSelf, invalidateTree } from "./ops.js";
+import { execute, isSelfWrite, note, ensureTree, markSelf, invalidateTree, beginBulk, noteBulk, endBulk, bulkProgress } from "./ops.js";
 
 const bm = () => globalThis.chrome.bookmarks;
 
@@ -147,7 +147,7 @@ export async function settleMove(id, parentId) {
 // 按当前规则把「已经躺在库里」的书签搬正（新收藏有 autoRoute，这一支补的是存量）。
 // 本函数跑在 execute 的串行队列里，内部只直连 chrome.bookmarks——再调 execute 会自锁。
 // 一笔操作日志 + 一键撤销：撤销会把书签搬回原位，并回收本次新建的空文件夹。
-export async function applyRules({ path: scope, dryRun = false, includeFallback = false, config } = {}) {
+export async function applyRules({ path: scope, dryRun = false, includeFallback = false, config } = {}, ctx = {}) {
   const cfg = config ? normalize(config) : await read();
   if (!cfg.enabled) throw new Error("「收藏归位」总开关是关的：规则不会生效，请先开启（rules_set 里设 enabled:true）");
 
@@ -207,16 +207,28 @@ export async function applyRules({ path: scope, dryRun = false, includeFallback 
 
   let moved = 0;
   const failed = [];
-  for (const [parentId, ids] of groups) {
-    markSelf(ids, parentId);   // 先记账再搬：事件异步派发，晚记会把我们自己的移动当外部移动
-    for (let i = 0; i < ids.length; i += 128) {
-      await Promise.all(ids.slice(i, i + 128).map(async (id) => {
-        try { await bm().move(id, { parentId }); moved++; }
-        catch (e) { failed.push({ id, error: String((e && e.message) || e) }); }
-      }));
+  beginBulk("rules.apply", items.length);
+  try {
+    for (const it of items) noteBulk(it.id, it.targetId);
+    let processed = 0;
+    for (const [parentId, ids] of groups) {
+      markSelf(ids, parentId);   // 先记账再搬：事件异步派发，晚记会把我们自己的移动当外部移动
+      for (let i = 0; i < ids.length; i += 128) {
+        await Promise.all(ids.slice(i, i + 128).map(async (id) => {
+          try { await bm().move(id, { parentId }); moved++; }
+          catch (e) { failed.push({ id, error: String((e && e.message) || e) }); }
+        }));
+        processed += Math.min(128, ids.length - i);
+        const p = { done: processed, total: items.length, moved, failed: failed.length };
+        bulkProgress(p);
+        if (ctx.onProgress) { try { ctx.onProgress(p); } catch (e) { /* ignore */ } }
+        await new Promise((r) => setTimeout(r, 0));
+      }
     }
+    invalidateTree();
+  } finally {
+    endBulk({ done: items.length, total: items.length, moved, failed: failed.length });
   }
-  invalidateTree();
 
   return {
     ...report,

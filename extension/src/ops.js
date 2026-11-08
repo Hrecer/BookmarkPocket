@@ -5,6 +5,17 @@
 import { K } from "./keys.js";
 
 const LOG_CAP = 300;
+const SELF_TTL_MS = 30000;          // 单条写入的认领窗口
+const SELF_CAP = 5000;
+const BULK_GRACE_MS = 15000;        // 批量结束后继续认领迟到事件
+
+// 控制/只读操作不排进批量写入的串行队列：否则一次大移动会把状态、重连、规则读取
+// 全部堵在队列后面，管理页看起来就像「中枢没运行」。
+const CONTROL_OPS = new Set([
+  "sys.ping", "sys.status", "sys.bulk.status",
+  "sys.bridge.status", "sys.bridge.reconnect", "sys.bridge.pair", "sys.hub.shutdown",
+  "rules.get", "rules.set", "log.tail",
+]);
 
 let treeCache = null;
 let tail = Promise.resolve();
@@ -14,33 +25,122 @@ const st = () => globalThis.chrome.storage.local;
 
 export function invalidateTree() { treeCache = null; }
 
-// 扩展自己写入期间置位。rules.autoRoute 靠它区分「我们建的」与「用户收藏的」——
-// 否则自动归位会把自己刚建好的条目再搬一次。execute 是唯一的写入入口，所以这里置位就够。
+// 扩展自己写入期间置位。保留给测试/旧调用；批量操作改用下面的 bulk 上下文，
+// 不再靠这个全局标志判断 onCreated（长批量会把用户的新收藏也误吞）。
 let internal = 0;
 
 export function isInternalWrite() { return internal > 0; }
 
 // 我们自己写过的书签：记「这是我们的动作，写进去时父目录是谁」。
-// 书签事件是异步派发的，处理器跑起来时 internal 计数可能已经归零，所以要在事件里认领自己那一下。
 // 认领口径是父目录，不能只按 id 一刀切：那样会把浏览器随后对同一条书签的挪动也当成自己的而漏掉。
 const selfWrites = new Map();
 
+// 批量上下文：批量写入的 id → 目标父目录。
+// 批量操作往往远超单条认领窗口（10 秒远远不够），单靠时间戳会把迟到事件误判成外部操作，
+// 触发 settleMove/autoRoute 洪泛，最终把串行队列堵死。
+let bulkDepth = 0;
+const bulkWrites = new Map();
+let bulkGraceUntil = 0;
+let lastBulk = null;
+let progressHook = null;
+let bulkEndHook = null;
+
+function pruneSelfWrites() {
+  const now = Date.now();
+  for (const [id, r] of selfWrites) if (now - r.ts > SELF_TTL_MS) selfWrites.delete(id);
+  while (selfWrites.size > SELF_CAP) {
+    const first = selfWrites.keys().next().value;
+    if (first === undefined) break;
+    selfWrites.delete(first);
+  }
+}
+
+function pruneBulk() {
+  if (bulkDepth === 0 && bulkGraceUntil && Date.now() > bulkGraceUntil) {
+    bulkWrites.clear();
+    bulkGraceUntil = 0;
+  }
+}
+
 export function markSelf(ids, parentId) {
+  pruneSelfWrites();
   const ts = Date.now();
   for (const id of [].concat(ids)) selfWrites.set(String(id), { parentId: String(parentId), ts });
 }
 
 export function isSelfWrite(id, parentId) {
-  const r = selfWrites.get(String(id));
+  pruneBulk();
+  const sid = String(id);
+  if (bulkWrites.has(sid)) {
+    const bp = bulkWrites.get(sid);
+    return parentId !== undefined && parentId !== null && String(parentId) === bp;
+  }
+  const r = selfWrites.get(sid);
   if (!r) return false;
-  if (Date.now() - r.ts > 10000) { selfWrites.delete(String(id)); return false; }
+  if (Date.now() - r.ts > SELF_TTL_MS) { selfWrites.delete(sid); return false; }
   return parentId !== undefined && parentId !== null && String(parentId) === r.parentId;
 }
 
-export function execute(op, args = {}) {
+export function isBulkActive() { return bulkDepth > 0; }
+export function isBulkQuiet() { pruneBulk(); return bulkDepth > 0 || bulkGraceUntil > Date.now(); }
+
+export function beginBulk(op, total = 0) {
+  pruneBulk();
+  bulkDepth++;
+  bulkGraceUntil = 0;
+  lastBulk = {
+    op: String(op || ""),
+    status: "running",
+    total: Math.max(0, Number(total) || 0),
+    done: 0,
+    failed: 0,
+    startedAt: Date.now(),
+  };
+}
+
+export function noteBulk(id, parentId) {
+  if (bulkDepth === 0) return;
+  bulkWrites.set(String(id), String(parentId));
+}
+
+export function bulkProgress(p = {}) {
+  if (!lastBulk) return;
+  lastBulk = { ...lastBulk, ...p, updatedAt: Date.now() };
+  if (progressHook) {
+    try { progressHook({ ...lastBulk }); } catch (e) { /* ignore */ }
+  }
+}
+
+export function endBulk(p = {}) {
+  bulkDepth = Math.max(0, bulkDepth - 1);
+  if (bulkDepth !== 0) return;
+  bulkGraceUntil = Date.now() + BULK_GRACE_MS;
+  if (lastBulk) {
+    lastBulk = {
+      ...lastBulk,
+      ...p,
+      status: Number((p.failed !== undefined ? p.failed : lastBulk.failed) || 0) > 0 ? "done_with_errors" : "done",
+      endedAt: Date.now(),
+    };
+    if (progressHook) { try { progressHook({ ...lastBulk }); } catch (e) { /* ignore */ } }
+  }
+  if (bulkEndHook) { try { bulkEndHook(); } catch (e) { /* ignore */ } }
+}
+
+export function getBulkStatus() {
+  pruneBulk();
+  return lastBulk ? { ...lastBulk, active: bulkDepth > 0 } : { status: "idle", active: false };
+}
+
+export function setProgressHook(fn) { progressHook = typeof fn === "function" ? fn : null; }
+export function setBulkEndHook(fn) { bulkEndHook = typeof fn === "function" ? fn : null; }
+
+export function execute(op, args = {}, opts = {}) {
+  const name = String(op || "");
+  if (CONTROL_OPS.has(name)) return dispatch(name, args, opts);
   const p = tail.then(async () => {
     internal++;
-    try { return await dispatch(String(op || ""), args || {}); }
+    try { return await dispatch(name, args, opts); }
     finally { internal--; }
   });
   tail = p.then(() => {}, () => {});
@@ -49,10 +149,10 @@ export function execute(op, args = {}) {
 
 export function defineOps(map) { Object.assign(OPS, map); }
 
-async function dispatch(op, args) {
+async function dispatch(op, args, opts = {}) {
   const h = OPS[op];
   if (!h) throw new Error("未知操作: " + op);
-  const result = await h.fn(args);
+  const result = await h.fn(args, opts);
   if (h.mutating && result && result.undo) {
     await pushLog({ ts: Date.now(), op, args, summary: result.summary || null, undo: result.undo });
   }
@@ -125,20 +225,29 @@ async function snapshotNodes(rootIds) {
   return out;
 }
 
-async function restoreSnapshot(nodes) {
+async function restoreSnapshot(nodes, onProgress) {
   const remap = new Map();
-  for (const n of nodes) {
+  const total = nodes.length;
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
     const parentId = remap.get(n.parentId) || n.parentId;
     let alive = false;
     try { alive = !!(await bm().get(n.id))[0]; } catch (e) { alive = false; }
     if (alive) {
       try { await bm().move(n.id, { parentId, index: n.index }); } catch (e) { /* 尽力恢复 */ }
       markSelf(n.id, parentId);
+      noteBulk(n.id, parentId);
       remap.set(n.id, n.id);
     } else {
       const c = await bm().create({ parentId, index: n.index, title: n.title, url: n.url || undefined });
       markSelf(c.id, parentId);
+      noteBulk(c.id, parentId);
       remap.set(n.id, c.id);
+    }
+    if ((i + 1) % 25 === 0 || i === total - 1) {
+      const p = { done: i + 1, total, restored: i + 1 };
+      bulkProgress(p);
+      if (onProgress) { try { onProgress(p); } catch (e) { /* ignore */ } }
     }
   }
   invalidateTree();
@@ -153,8 +262,12 @@ const OPS = {
     fn: async () => {
       const log = await readLog();
       const manifest = (globalThis.chrome.runtime && chrome.runtime.getManifest) ? chrome.runtime.getManifest() : null;
-      return { version: manifest ? manifest.version : null, logEntries: log.length, treeCached: !!treeCache };
+      return { version: manifest ? manifest.version : null, logEntries: log.length, treeCached: !!treeCache, bulk: getBulkStatus() };
     },
+  },
+
+  "sys.bulk.status": {
+    fn: async () => getBulkStatus(),
   },
 
   "bookmark.tree": {
@@ -221,30 +334,43 @@ const OPS = {
   // 单项失败不中断整批，失败项原样回报。
   "bookmark.createMany": {
     mutating: true,
-    fn: async ({ parentId, items } = {}) => {
+    fn: async ({ parentId, items } = {}, opts = {}) => {
       if (!parentId) throw new Error("缺少 parentId");
       const list = Array.isArray(items) ? items : [];
       if (!list.length) throw new Error("items 不能为空");
       const created = [];
       const failed = [];
-      for (const it of list) {
-        try {
-          const spec = { parentId, title: (it && it.title) || "" };
-          if (it && it.url) spec.url = String(it.url);
-          const made = await bm().create(spec);
-          created.push({ id: made.id, title: made.title || "", url: made.url || null });
-        } catch (e) {
-          failed.push({ title: (it && it.title) || "", error: String((e && e.message) || e) });
+      beginBulk("bookmark.createMany", list.length);
+      try {
+        for (let i = 0; i < list.length; i++) {
+          const it = list[i];
+          try {
+            const spec = { parentId, title: (it && it.title) || "" };
+            if (it && it.url) spec.url = String(it.url);
+            const made = await bm().create(spec);
+            markSelf(made.id, parentId);
+            noteBulk(made.id, parentId);
+            created.push({ id: made.id, title: made.title || "", url: made.url || null });
+          } catch (e) {
+            failed.push({ title: (it && it.title) || "", error: String((e && e.message) || e) });
+          }
+          if ((i + 1) % 10 === 0 || i === list.length - 1) {
+            const p = { done: i + 1, total: list.length, created: created.length, failed: failed.length };
+            bulkProgress(p);
+            if (opts.onProgress) { try { opts.onProgress(p); } catch (e) { /* ignore */ } }
+          }
         }
+        invalidateTree();
+        return {
+          created,
+          failed,
+          total: list.length,
+          summary: `批量新建 ${created.length} 项`,
+          undo: { kind: "deleteCreated", ids: created.map((c) => c.id) },
+        };
+      } finally {
+        endBulk({ done: list.length, total: list.length, created: created.length, failed: failed.length });
       }
-      markSelf(created.map((c) => c.id), parentId);
-      invalidateTree();
-      return {
-        created,
-        failed,
-        summary: `批量新建 ${created.length} 项`,
-        undo: { kind: "deleteCreated", ids: created.map((c) => c.id) },
-      };
     },
   },
 
@@ -293,7 +419,7 @@ const OPS = {
   // 批量移动：一次调用内部完成整批（一次 getTree 取前像，再分块并发移动），只记一笔操作日志。
   "bookmark.moveMany": {
     mutating: true,
-    fn: async ({ ids, parentId, chunk = 64 } = {}) => {
+    fn: async ({ ids, parentId, chunk = 32 } = {}, opts = {}) => {
       const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean).map(String);
       if (!list.length || !parentId) throw new Error("缺少 ids 或 parentId");
       const idx = new Map();
@@ -308,25 +434,44 @@ const OPS = {
         const b = idx.get(id);
         if (b) moves.push({ id, parentId: b.parentId, index: b.index });
       }
+      const startedAt = Date.now();
       let moved = 0;
       const failed = [];
-      markSelf(list, parentId);
-      const size = Math.max(1, Math.min(Number(chunk) || 64, 256));
-      for (let i = 0; i < moves.length; i += size) {
-        await Promise.all(moves.slice(i, i + size).map(async (m) => {
-          try { await bm().move(m.id, { parentId }); moved++; }
-          catch (e) { failed.push({ id: m.id, error: String((e && e.message) || e) }); }
-        }));
+      if (!moves.length) {
+        return { moved: 0, failed, total: 0, summary: "批量移动 0 项", undo: { kind: "moveMany", moves } };
       }
-      invalidateTree();
-      return { moved, failed, summary: `批量移动 ${moved} 项`, undo: { kind: "moveMany", moves } };
+      beginBulk("bookmark.moveMany", moves.length);
+      try {
+        // 先记账再搬：事件异步派发，批量耗时可能远超单条认领窗口。
+        markSelf(list, parentId);
+        for (const m of moves) noteBulk(m.id, parentId);
+        const size = Math.max(1, Math.min(Number(chunk) || 32, 128));
+        for (let i = 0; i < moves.length; i += size) {
+          await Promise.all(moves.slice(i, i + size).map(async (m) => {
+            try { await bm().move(m.id, { parentId }); moved++; }
+            catch (e) { failed.push({ id: m.id, error: String((e && e.message) || e) }); }
+          }));
+          const p = { done: Math.min(i + size, moves.length), total: moves.length, moved, failed: failed.length };
+          bulkProgress(p);
+          if (opts.onProgress) { try { opts.onProgress(p); } catch (e) { /* ignore */ } }
+          await new Promise((r) => setTimeout(r, 0));   // 让事件/控制请求有机会插队
+        }
+        invalidateTree();
+        return {
+          moved, failed, total: moves.length, elapsedMs: Date.now() - startedAt,
+          summary: `批量移动 ${moved} 项`,
+          undo: { kind: "moveMany", moves },
+        };
+      } finally {
+        endBulk({ done: moves.length, total: moves.length, moved, failed: failed.length });
+      }
     },
   },
 
   // 复制：节点（含整棵子树）复制到目标文件夹，层内保持原序；撤销=删掉所有复制品。
   "bookmark.copy": {
     mutating: true,
-    fn: async ({ ids, parentId } = {}) => {
+    fn: async ({ ids, parentId } = {}, opts = {}) => {
       const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean).map(String);
       if (!list.length || !parentId) throw new Error("缺少 ids 或 parentId");
       const idx = new Map();
@@ -338,22 +483,33 @@ const OPS = {
       let copied = 0;
       const failed = [];
       const created = [];
-      const copyInto = async (node, targetParent) => {
-        const spec = { parentId: targetParent, title: node.title || "" };
-        if (node.url) spec.url = node.url;
-        const made = await bm().create(spec);
-        markSelf(made.id, targetParent);   // 整棵子树都算我们写的，别被归位再搬一次
-        copied++;
-        if (!node.url) for (const c of node.children || []) await copyInto(c, made.id);
-        return made.id;
-      };
-      for (const n of roots) {
-        try { created.push(await copyInto(n, parentId)); }
-        catch (e) { failed.push({ id: n.id, error: String((e && e.message) || e) }); }
+      beginBulk("bookmark.copy", roots.length);
+      try {
+        const copyInto = async (node, targetParent) => {
+          const spec = { parentId: targetParent, title: node.title || "" };
+          if (node.url) spec.url = node.url;
+          const made = await bm().create(spec);
+          markSelf(made.id, targetParent);   // 整棵子树都算我们写的，别被归位再搬一次
+          noteBulk(made.id, targetParent);
+          copied++;
+          if (!node.url) for (const c of node.children || []) await copyInto(c, made.id);
+          return made.id;
+        };
+        for (let i = 0; i < roots.length; i++) {
+          const n = roots[i];
+          try { created.push(await copyInto(n, parentId)); }
+          catch (e) { failed.push({ id: n.id, error: String((e && e.message) || e) }); }
+          const p = { done: i + 1, total: roots.length, copied, failed: failed.length };
+          bulkProgress(p);
+          if (opts.onProgress) { try { opts.onProgress(p); } catch (e) { /* ignore */ } }
+          await new Promise((r) => setTimeout(r, 0));
+        }
+        markSelf(created, parentId);
+        invalidateTree();
+        return { copied, failed, created, total: roots.length, summary: `复制 ${copied} 项`, undo: { kind: "deleteCreated", ids: created } };
+      } finally {
+        endBulk({ done: roots.length, total: roots.length, copied, failed: failed.length });
       }
-      markSelf(created, parentId);
-      invalidateTree();
-      return { copied, failed, created, summary: `复制 ${copied} 项`, undo: { kind: "deleteCreated", ids: created } };
     },
   },
 
@@ -361,7 +517,7 @@ const OPS = {
   // 安全网是不可见的：前像存在扩展存储里，失手可用 bookmark_undo_last 回放。
   "bookmark.remove": {
     mutating: true,
-    fn: async ({ ids, dryRun = false } = {}) => {
+    fn: async ({ ids, dryRun = false } = {}, opts = {}) => {
       const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean).map(String);
       if (!list.length) throw new Error("ids 不能为空");
       const nodes = await snapshotNodes(list);
@@ -369,21 +525,33 @@ const OPS = {
         return { plan: true, willAffect: nodes.length, roots: nodes.filter((n) => list.includes(n.id)) };
       }
       let removed = 0;
-      for (const id of list) {
-        const n = (await bm().get(id).catch(() => []))[0];
-        if (!n) continue;
-        if (n.url) await bm().remove(id);
-        else await bm().removeTree(id);
-        removed++;
+      beginBulk("bookmark.remove", list.length);
+      try {
+        for (let i = 0; i < list.length; i++) {
+          const id = list[i];
+          const n = (await bm().get(id).catch(() => []))[0];
+          if (n) {
+            if (n.url) await bm().remove(id);
+            else await bm().removeTree(id);
+            removed++;
+          }
+          if ((i + 1) % 10 === 0 || i === list.length - 1) {
+            const p = { done: i + 1, total: list.length, removed };
+            bulkProgress(p);
+            if (opts.onProgress) { try { opts.onProgress(p); } catch (e) { /* ignore */ } }
+          }
+        }
+        invalidateTree();
+        return { removed, total: list.length, summary: `删除 ${removed} 项`, undo: { kind: "restore", nodes } };
+      } finally {
+        endBulk({ done: list.length, total: list.length, removed });
       }
-      invalidateTree();
-      return { removed, summary: `删除 ${removed} 项`, undo: { kind: "restore", nodes } };
     },
   },
 
   "bookmark.undoLast": {
     mutating: true,
-    fn: async () => {
+    fn: async (_args, opts = {}) => {
       const log = await readLog();
       let entry = null;
       while (log.length) {
@@ -394,34 +562,67 @@ const OPS = {
       if (!entry) throw new Error("没有可撤销的操作");
       const u = entry.undo;
       if (u.kind === "restore") {
-        await restoreSnapshot(u.nodes);
+        beginBulk("bookmark.undoLast", u.nodes.length);
+        try {
+          await restoreSnapshot(u.nodes, opts.onProgress);
+        } finally {
+          endBulk({ done: u.nodes.length, total: u.nodes.length });
+        }
       } else if (u.kind === "move") {
         await bm().move(u.id, { parentId: u.before.parentId, index: u.before.index });
         markSelf(u.id, u.before.parentId);
       } else if (u.kind === "moveMany") {
-        for (const m of u.moves) {
-          try { await bm().move(m.id, { parentId: m.parentId, index: m.index }); } catch (e) { /* 尽力 */ }
-          markSelf(m.id, m.parentId);
-        }
-        // 批量归位顺带新建的目标文件夹：搬回去后若已空，一并回收（不留空壳）
-        for (const id of u.createdFolders || []) {
-          try {
-            const kids = await bm().getChildren(id);
-            if (!kids.length) await bm().removeTree(id);
-          } catch (e) { /* 尽力 */ }
+        beginBulk("bookmark.undoLast", u.moves.length);
+        let restored = 0;
+        try {
+          for (let i = 0; i < u.moves.length; i++) {
+            const m = u.moves[i];
+            try { await bm().move(m.id, { parentId: m.parentId, index: m.index }); restored++; } catch (e) { /* 尽力 */ }
+            markSelf(m.id, m.parentId);
+            noteBulk(m.id, m.parentId);
+            if ((i + 1) % 25 === 0 || i === u.moves.length - 1) {
+              const p = { done: i + 1, total: u.moves.length, restored };
+              bulkProgress(p);
+              if (opts.onProgress) { try { opts.onProgress(p); } catch (e) { /* ignore */ } }
+            }
+            await new Promise((r) => setTimeout(r, 0));
+          }
+          // 批量归位顺带新建的目标文件夹：搬回去后若已空，一并回收（不留空壳）
+          for (const id of u.createdFolders || []) {
+            try {
+              const kids = await bm().getChildren(id);
+              if (!kids.length) await bm().removeTree(id);
+            } catch (e) { /* 尽力 */ }
+          }
+        } finally {
+          endBulk({ done: u.moves.length, total: u.moves.length, restored });
         }
       } else if (u.kind === "update") {
         const dir = { title: u.before.title };
         if (u.before.url) dir.url = u.before.url;
         await bm().update(u.id, dir);
       } else if (u.kind === "deleteCreated") {
-        for (const id of u.ids) {
-          try {
-            const n = (await bm().get(id))[0];
-            if (!n) continue;
-            if (n.url) await bm().remove(id);
-            else await bm().removeTree(id);
-          } catch (e) { /* 尽力 */ }
+        beginBulk("bookmark.undoLast", u.ids.length);
+        let removed = 0;
+        try {
+          for (let i = 0; i < u.ids.length; i++) {
+            const id = u.ids[i];
+            try {
+              const n = (await bm().get(id))[0];
+              if (n) {
+                if (n.url) await bm().remove(id);
+                else await bm().removeTree(id);
+                removed++;
+              }
+            } catch (e) { /* 尽力 */ }
+            if ((i + 1) % 10 === 0 || i === u.ids.length - 1) {
+              const p = { done: i + 1, total: u.ids.length, removed };
+              bulkProgress(p);
+              if (opts.onProgress) { try { opts.onProgress(p); } catch (e) { /* ignore */ } }
+            }
+          }
+        } finally {
+          endBulk({ done: u.ids.length, total: u.ids.length, removed });
         }
       } else {
         throw new Error("该操作不支持撤销: " + u.kind);

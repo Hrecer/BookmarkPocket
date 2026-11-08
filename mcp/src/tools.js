@@ -85,12 +85,12 @@ export const TOOLS = [
   },
   {
     name: "bookmark_move_many",
-    description: "批量移动：一次调用把多个书签/文件夹移到同一目标文件夹，整批只记一笔撤销（要比逐条调 bookmark_move 快得多）",
+    description: "批量移动：一次调用把多个书签/文件夹移到同一目标文件夹，整批只记一笔撤销（要比逐条调 bookmark_move 快得多；默认 chunk 32，最大 128；大批量可用 bulk_status 查看进度）",
     op: "bookmark.moveMany",
     shape: {
       ids: z.array(z.string()).describe("要移动的 id 列表"),
       parentId: z.string().describe("目标文件夹 id"),
-      chunk: z.number().optional().describe("并发分块大小，默认 64，上限 256"),
+      chunk: z.number().optional().describe("并发分块大小，默认 32，上限 128"),
     },
   },
   {
@@ -113,6 +113,12 @@ export const TOOLS = [
     description: "查看最近操作日志（人与 Agent 共用同一份日志）",
     op: "log.tail",
     shape: { n: z.number().optional().describe("条数，默认 20") },
+  },
+  {
+    name: "bulk_status",
+    description: "查看当前/最近一次批量操作的进度（不占操作队列；批量移动、批量新建、删除、撤销、规则套用后可用）",
+    op: "sys.bulk.status",
+    shape: {},
   },
   {
     name: "rules_get",
